@@ -1,0 +1,9 @@
+인공지능은 데이터를 사용하여 패턴을 학습합니다.
+언어모델은 이전 토큰으로부터 다음 토큰을 예측합니다.
+트랜스포머는 어텐션과 신경망 연산을 반복합니다.
+Mixture of Experts uses a router to select expert networks.
+The GENESIS project studies data, modeling, training, and evaluation.
+모델을 크게 만든다고 반드시 좋은 답변이 나오는 것은 아닙니다.
+학습 데이터의 품질과 평가 설계도 중요합니다.
+처음에는 작은 실험으로 수치가 맞는지 확인합니다.
+실험을 통과한 시스템을 분산 컴퓨팅 환경으로 확장합니다.
