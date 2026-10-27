@@ -1,0 +1,7 @@
+﻿GENESIS-10T is a research project for building a large language model.
+A language model learns patterns from text.
+A transformer processes sequences of tokens.
+Attention helps the model use information from context.
+Mixture of Experts uses different expert networks.
+Training adjusts model parameters to reduce prediction errors.
+GENESIS-10T begins with small experiments before scaling up.
