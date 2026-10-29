@@ -13,6 +13,8 @@ dependencies = ["torch>=2.2", "numpy>=1.24", "tokenizers>=0.15"]
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 parquet = ["pyarrow>=14"]
+export = ["transformers>=4.45", "safetensors>=0.4"]
+eval = ["transformers>=4.45", "safetensors>=0.4", "lm_eval>=0.4.5", "accelerate", "datasets"]
 
 [tool.setuptools.packages.find]
 where = ["."]

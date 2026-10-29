@@ -51,10 +51,10 @@ class RotaryEmbedding(nn.Module):
         first, second = x.chunk(2, dim=-1)
         return torch.cat((-second, first), dim=-1)
 
-    def forward(self, q: torch.Tensor, k: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, q: torch.Tensor, k: torch.Tensor, start: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
         seq_len = q.shape[-2]
-        cos = self.cos[:seq_len].to(q.dtype)
-        sin = self.sin[:seq_len].to(q.dtype)
+        cos = self.cos[start:start + seq_len].to(q.dtype)
+        sin = self.sin[start:start + seq_len].to(q.dtype)
         return q * cos + self._rotate_half(q) * sin, k * cos + self._rotate_half(k) * sin
 
 
@@ -70,20 +70,32 @@ class CausalSelfAttention(nn.Module):
         self.rope = (RotaryEmbedding(self.head_dim, config.context_length, config.rope_theta)
                      if config.position == "rope" else None)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, cache: dict | None = None) -> torch.Tensor:
+        """``cache`` (inference only) holds this layer's past keys/values and is updated in place."""
         batch, seq_len, _ = x.shape
+        past = 0 if cache is None or "k" not in cache else cache["k"].shape[2]
         q, k, v = self.qkv(x).split(self.split, dim=-1)
         q = q.view(batch, seq_len, self.heads, self.head_dim).transpose(1, 2)
         k = k.view(batch, seq_len, self.kv_heads, self.head_dim).transpose(1, 2)
         v = v.view(batch, seq_len, self.kv_heads, self.head_dim).transpose(1, 2)
         if self.rope is not None:
-            q, k = self.rope(q, k)
+            q, k = self.rope(q, k, start=past)
+        if cache is not None:
+            if past:
+                k = torch.cat((cache["k"], k), dim=2)
+                v = torch.cat((cache["v"], v), dim=2)
+            cache["k"], cache["v"] = k, v
         if self.kv_heads != self.heads:
             repeat = self.heads // self.kv_heads
             k = k.repeat_interleave(repeat, dim=1)
             v = v.repeat_interleave(repeat, dim=1)
+        mask, causal = None, True
+        if past:
+            causal = False
+            if seq_len > 1:  # new queries see all past keys plus a causal block of new ones
+                mask = torch.ones(seq_len, past + seq_len, dtype=torch.bool, device=x.device).tril(diagonal=past)
         attended = F.scaled_dot_product_attention(
-            q, k, v, is_causal=True, dropout_p=self.dropout if self.training else 0.0)
+            q, k, v, attn_mask=mask, is_causal=causal, dropout_p=self.dropout if self.training else 0.0)
         return self.proj(attended.transpose(1, 2).reshape(batch, seq_len, -1))
 
 
@@ -140,13 +152,19 @@ class TransformerBlock(nn.Module):
         self.ffn = SparseMoE(config) if config.is_moe else ExpertMLP(config.d_model, config.expert_hidden_dim)
         self.dropout = nn.Dropout(config.dropout)
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, dict[str, torch.Tensor] | None]:
-        x = x + self.dropout(self.attention(self.attention_norm(x)))
+    def forward(self, x: torch.Tensor, cache: dict | None = None) -> tuple[torch.Tensor, dict[str, torch.Tensor] | None]:
+        x = x + self.dropout(self.attention(self.attention_norm(x), cache))
         if isinstance(self.ffn, SparseMoE):
             out, aux = self.ffn(self.ffn_norm(x))
         else:
             out, aux = self.ffn(self.ffn_norm(x)), None
         return x + self.dropout(out), aux
+
+
+def cache_length(cache: list[dict] | None) -> int:
+    if not cache or "k" not in cache[0]:
+        return 0
+    return cache[0]["k"].shape[2]
 
 
 class GenesisLM(nn.Module):
@@ -177,18 +195,22 @@ class GenesisLM(nn.Module):
         elif isinstance(module, nn.Embedding):
             nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, ids: torch.Tensor, targets: torch.Tensor | None = None) -> dict[str, torch.Tensor]:
+    def forward(self, ids: torch.Tensor, targets: torch.Tensor | None = None,
+                cache: list[dict] | None = None) -> dict[str, torch.Tensor]:
+        """``cache``: list with one dict per layer (see ``new_cache``) for incremental decoding."""
         if ids.ndim != 2:
             raise ValueError("expected [batch, sequence] token ids")
         _, seq_len = ids.shape
-        if seq_len > self.config.context_length:
+        past = cache_length(cache)
+        if past + seq_len > self.config.context_length:
             raise ValueError("sequence longer than configured context_length")
         hidden = self.token_embedding(ids)
         if self.position_embedding is not None:
-            hidden = hidden + self.position_embedding(torch.arange(seq_len, device=ids.device))[None]
+            positions = torch.arange(past, past + seq_len, device=ids.device)
+            hidden = hidden + self.position_embedding(positions)[None]
         balances, z_losses, loads = [], [], []
-        for block in self.blocks:
-            hidden, aux = block(hidden)
+        for index, block in enumerate(self.blocks):
+            hidden, aux = block(hidden, cache[index] if cache is not None else None)
             if aux is not None:
                 balances.append(aux["balance"])
                 z_losses.append(aux["z_loss"])
@@ -207,17 +229,31 @@ class GenesisLM(nn.Module):
                               + self.config.router_z_loss_weight * z_loss)
         return result
 
+    def new_cache(self) -> list[dict]:
+        return [{} for _ in self.blocks]
+
     @torch.no_grad()
     def generate(self, ids: torch.Tensor, new_tokens: int = 40, temperature: float = 1.0,
-                 top_k: int | None = None, eos_id: int | None = None) -> torch.Tensor:
+                 top_k: int | None = None, eos_id: int | None = None, use_cache: bool = True) -> torch.Tensor:
+        """Sample ``new_tokens``. With ``use_cache`` each step feeds only the newest token.
+        Once prompt + output exceed ``context_length`` the cache is rebuilt from the last
+        ``context_length`` tokens each step, so results equal the uncached sliding window."""
         if temperature <= 0:
             raise ValueError("temperature must be > 0")
         if new_tokens < 0 or ids.ndim != 2 or ids.shape[1] < 1:
             raise ValueError("invalid prompt or new_tokens")
         self.eval()
+        window = self.config.context_length
+        cache = None
         for _ in range(new_tokens):
-            context = ids[:, -self.config.context_length:]
-            logits = self(context)["logits"][:, -1, :].float() / temperature
+            if not use_cache:
+                logits = self(ids[:, -window:])["logits"][:, -1, :]
+            elif cache is None or cache_length(cache) >= window:
+                cache = self.new_cache()  # (re)fill from the last `window` tokens
+                logits = self(ids[:, -window:], cache=cache)["logits"][:, -1, :]
+            else:
+                logits = self(ids[:, -1:], cache=cache)["logits"][:, -1, :]
+            logits = logits.float() / temperature
             if top_k is not None:
                 if not 1 <= top_k <= logits.shape[-1]:
                     raise ValueError("top_k out of range")

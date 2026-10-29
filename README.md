@@ -33,7 +33,7 @@ The demo corpus is tiny, so generation is nonsense; the point is that every stag
 
 ## The real pipeline
 
-See **[docs/02_pipeline_ko.md](docs/02_pipeline_ko.md)** for the step-by-step guide and **[docs/03_next_steps_ko.md](docs/03_next_steps_ko.md)** for what to do next.
+Guides (Korean): [data → training](docs/02_pipeline_ko.md) · [next steps](docs/03_next_steps_ko.md) · [benchmarks](docs/04_benchmarks_ko.md) · [instruction tuning](docs/05_sft_ko.md).
 
 ```bash
 # A. sources -> normalized, filtered, PII-masked, deduplicated, split text (+ DATA_CARD.md)
@@ -64,7 +64,11 @@ python -m genesis.contamination --train data/clean/v1 --benchmark bench.jsonl --
 | `genesis/train.py` | LR schedule, grad accumulation, BF16, DDP, exact resume, bpb, MFU |
 | `genesis/evaluate.py`, `contamination.py` | Held-out loss/bpb; benchmark n-gram contamination + blocklist |
 | `genesis/estimate.py` | Exact parameter counts, training FLOPs and GPU-hours |
-| `configs/` | `debug`, `ko-tiny-cpu`, `dense-100m`, `moe-8x-100m-active`, `dense-300m`, `dense-1b`, `sources.example.json` |
+| `genesis/export_hf.py` | Dense checkpoint → Hugging Face Llama folder (+ chat template), verified logit-for-logit |
+| `genesis/bench_to_jsonl.py` | KoBEST / HAE-RAE / CLIcK / KMMLU items for contamination checks |
+| `genesis/ladder.py` | Scaling-ladder run plan, power-law fit, plot, prediction |
+| `genesis/chat.py`, `genesis/data/sft.py` | Chat format and instruction-tuning data with assistant-only loss |
+| `configs/` | `debug`, `ko-tiny-cpu`, `dense-40m`, `dense-100m`, `moe-8x-100m-active`, `dense-300m`, `dense-1b`, `sources.example.json` |
 
 ## Data governance
 
@@ -74,7 +78,7 @@ Use only datasets you own or whose terms permit the intended training and redist
 
 - No FSDP/tensor/pipeline/expert parallelism yet: DDP only, so models must fit on one GPU (≈ up to 1B on 80 GB).
 - MoE routing is a single-device loop, correct but not fast.
-- No KV cache in generation, no instruction tuning, no downstream benchmark harness integration yet.
+- MoE checkpoints cannot be exported to Hugging Face yet; no preference tuning (DPO) or safety evaluation yet.
 - Never infer quality from parameter count alone; verify against held-out benchmarks.
 
 License for **code**: MIT. Dataset licensing must be evaluated separately.

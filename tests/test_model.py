@@ -84,3 +84,28 @@ def test_generate_respects_context_and_eos():
     with torch.no_grad():
         generated = model.generate(prompt, new_tokens=3, top_k=4)
     assert generated.shape == (1, 15)
+
+
+@pytest.mark.parametrize("name", VARIANTS)
+def test_kv_cache_matches_full_recompute(name):
+    torch.manual_seed(5)
+    model = GenesisLM(small(**VARIANTS[name])).eval()
+    ids = torch.randint(0, 257, (2, 10))
+    with torch.no_grad():
+        full = model(ids)["logits"]
+        cache = model.new_cache()
+        prefix = model(ids[:, :6], cache=cache)["logits"]
+        chunk = model(ids[:, 6:8], cache=cache)["logits"]      # multi-token step uses a mask
+        steps = [model(ids[:, i:i + 1], cache=cache)["logits"] for i in (8, 9)]
+    incremental = torch.cat([prefix, chunk] + steps, dim=1)
+    assert torch.allclose(full, incremental, atol=1e-5)
+
+
+@pytest.mark.parametrize("prompt_len", [3, 20])
+def test_cached_generation_equals_uncached(prompt_len):
+    torch.manual_seed(1)
+    model = GenesisLM(small(context_length=16, n_experts=2, experts_per_token=1)).eval()
+    prompt = torch.randint(0, 255, (1, prompt_len))
+    a = model.generate(prompt, new_tokens=20, top_k=1, use_cache=True)
+    b = model.generate(prompt, new_tokens=20, top_k=1, use_cache=False)
+    assert torch.equal(a, b)
