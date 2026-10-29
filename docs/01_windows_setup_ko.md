@@ -27,16 +27,16 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m genesis.prepare --input data/raw --output data/processed --source self-authored-demo --license self-authored
 ```
 
-합격 기준: `train.bin`, `val.bin`, `manifest.json` 생성.
+합격 기준: `data/processed`에 `train_00000.bin`, `val_00000.bin`, `test_00000.bin`, `manifest.json` 생성. 샘플은 문서가 1개뿐이라 val/test를 토큰 단위로 잘라내며, manifest의 `split_strategy`에 그 사실이 기록된다.
 
 ## 3. 사전학습과 텍스트 생성
 
 ```powershell
-.\.venv\Scripts\python.exe -m genesis.train --steps 25 --batch-size 4 --eval-every 5
-.\.venv\Scripts\python.exe -m genesis.generate --prompt "인공지능은" --tokens 60
+.\.venv\Scripts\python.exe -m genesis.train --config configs/debug.json --data data/processed --out-dir checkpoints/debug --steps 25 --batch-size 4 --eval-every 5
+.\.venv\Scripts\python.exe -m genesis.generate --checkpoint checkpoints/debug/model.pt --prompt "인공지능은" --tokens 60
 ```
 
-합격 기준: 학습 로그에 loss 출력, `checkpoints/debug.pt` 생성, 생성 명령 오류 없음. **샘플 데이터가 너무 작아 의미 있는 답변이 나올 것으로 기대하면 안 된다.**
+합격 기준: 학습 로그에 loss와 val_bpb 출력, `checkpoints/debug/model.pt`(추론용)와 `ckpt_last.pt`(재개용) 생성, 생성 명령 오류 없음. **샘플 데이터가 너무 작아 의미 있는 답변이 나올 것으로 기대하면 안 된다.**
 
 ## 4. 10조 가설 모델의 크기만 계산
 
@@ -50,7 +50,11 @@ python -m venv .venv
 
 현재 기본 경로는 CPU 디버깅을 지원한다. NVIDIA CUDA GPU를 활용하려면 정확한 드라이버 및 GPU 종류에 맞춰 PyTorch 설치 명령을 공식 사이트에서 확인한다: https://pytorch.org/get-started/locally/ . 향후 다중 GPU/MoE 분산 실험은 WSL2 또는 리눅스에서 진행하는 것을 권장한다.
 
-## 6. GitHub에 독립 저장소 올리기
+## 6. 실제 데이터로 넘어가기
+
+실제 한국어 데이터 파이프라인은 [02_pipeline_ko.md](02_pipeline_ko.md), 다음 할 일은 [03_next_steps_ko.md](03_next_steps_ko.md)를 본다.
+
+## 7. GitHub에 독립 저장소 올리기
 
 GitHub에서 새 **빈** 저장소 `GENESIS-10T`를 만들고, 로컬에서 프로젝트 폴더를 열어 다음 명령을 실행한다. 저장소에 README/.gitignore/License 파일을 GitHub에서 추가로 생성하지 말 것(이미 프로젝트에 있음).
 

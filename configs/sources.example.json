@@ -10,12 +10,15 @@
       "rights_basis": "self-authored",
       "language": "any",
       "commercial_use": "yes",
-      "filters": {"min_chars": 10, "min_hangul_ratio": 0.0}
+      "filters": {
+        "min_chars": 10,
+        "min_hangul_ratio": 0.0
+      }
     },
     {
       "name": "kowiki",
       "type": "jsonl",
-      "path": "data/raw/kowiki/*.jsonl.gz",
+      "path": "data/raw/kowiki/**/wiki_*",
       "text_field": "text",
       "id_field": "id",
       "license": "CC-BY-SA-4.0",
@@ -24,12 +27,12 @@
       "rights_basis": "open-license",
       "language": "ko",
       "commercial_use": "yes",
-      "notes": "ShareAlike: redistributed derived text must keep CC BY-SA. Extract from the official dump (dumps.wikimedia.org) with wikiextractor or similar."
+      "notes": "ShareAlike: redistributed derived text must keep CC BY-SA. Download kowiki-latest-pages-articles.xml.bz2 from dumps.wikimedia.org and extract with `wikiextractor --json` (files AA/wiki_00 ... are JSON lines)."
     },
     {
       "name": "fineweb2-ko",
       "type": "parquet",
-      "path": "data/raw/fineweb2/kor_Hang/train/*.parquet",
+      "path": "data/raw/fineweb2/data/kor_Hang/train/*.parquet",
       "text_field": "text",
       "id_field": "id",
       "license": "ODC-By-1.0",
@@ -43,16 +46,19 @@
     },
     {
       "name": "kr-statutes",
-      "type": "jsonl",
-      "path": "data/raw/law/*.jsonl",
+      "type": "txt",
+      "path": "data/raw/law",
       "license": "KR-Copyright-Act-Art7",
       "license_url": "https://www.law.go.kr",
       "attribution": "국가법령정보센터 (법제처)",
       "rights_basis": "statutory-unprotected",
       "language": "ko",
       "commercial_use": "yes",
-      "notes": "Statutes, ordinances and court rulings are not protected works under Art. 7 of the Korean Copyright Act. Commentary or annotations added by publishers can be protected; keep only the official text.",
-      "filters": {"min_chars": 50}
+      "notes": "One .txt per statute/ruling, official text only (e.g. via the 국가법령정보 공동활용 Open API). Statutes and court rulings are not protected works under Art. 7 of the Korean Copyright Act; publisher commentary can be.",
+      "filters": {
+        "min_chars": 50
+      },
+      "doc_split": "file"
     }
   ]
 }

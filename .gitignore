@@ -8,3 +8,7 @@ data/processed/
 *.bin
 *.pt
 .env
+data/clean/
+data/tokens/
+reports/
+runs/
