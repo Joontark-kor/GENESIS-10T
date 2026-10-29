@@ -1,0 +1,12 @@
+{
+  "_comment": "Scaling-ladder point. 300M params; ~6B tokens at 20 tokens/param.",
+  "vocab_size": 32768,
+  "context_length": 2048,
+  "n_layers": 24,
+  "n_heads": 16,
+  "n_kv_heads": 4,
+  "d_model": 1024,
+  "n_experts": 1,
+  "experts_per_token": 1,
+  "expert_hidden_dim": 2816
+}

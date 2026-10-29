@@ -4,14 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genesis-10t"
-version = "0.1.0"
+version = "0.2.0"
 description = "Research-oriented foundation model project: from data to a scalable Mixture-of-Experts Transformer"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["torch>=2.2", "numpy>=1.24"]
+dependencies = ["torch>=2.2", "numpy>=1.24", "tokenizers>=0.15"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
+parquet = ["pyarrow>=14"]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -1,4 +1,5 @@
 {
+  "_comment": "CPU debug model: byte tokenizer, tiny MoE. Correctness checks only.",
   "vocab_size": 257,
   "context_length": 64,
   "n_layers": 2,
@@ -8,5 +9,8 @@
   "experts_per_token": 2,
   "expert_hidden_dim": 192,
   "dropout": 0.0,
-  "balance_loss_weight": 0.01
+  "balance_loss_weight": 0.01,
+  "router_z_loss_weight": 0.001,
+  "position": "rope",
+  "norm": "rmsnorm"
 }

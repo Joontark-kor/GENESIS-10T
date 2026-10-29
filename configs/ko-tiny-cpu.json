@@ -1,0 +1,11 @@
+{
+  "_comment": "~2M dense model for CPU smoke runs with a small BPE (vocab <= 8192).",
+  "vocab_size": 8192,
+  "context_length": 128,
+  "n_layers": 4,
+  "n_heads": 4,
+  "d_model": 128,
+  "n_experts": 1,
+  "experts_per_token": 1,
+  "expert_hidden_dim": 352
+}
