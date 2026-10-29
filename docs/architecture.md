@@ -2,7 +2,14 @@
 
 ## What exists now (verified milestone)
 
-A causal decoder-only Transformer with rotary-free learned positions, explicit masked self-attention, pre-normalization, sparse top-k MoE SwiGLU experts, an auxiliary router-balancing term and tied token/input embeddings. The reference implementation is correct-oriented rather than optimized.
+A decoder-only Transformer with RMSNorm pre-normalization, rotary position embeddings, grouped-query attention through `scaled_dot_product_attention`, and either a dense SwiGLU MLP (`n_experts = 1`) or a top-k routed SwiGLU MoE with a Switch-style balance loss and a router z-loss. Embeddings are tied by default. The older variant (learned positions, LayerNorm, biases) remains selectable in the config for comparison.
+
+The single-device MoE loop is written for correctness, not speed. Training supports BF16, gradient accumulation, DDP and exact resume; it does not yet shard parameters (FSDP) or experts.
+
+Design choices for Korean:
+- Text is NFC-normalized everywhere, so decomposed jamo (macOS, some scrapers) and precomposed syllables tokenize identically.
+- The tokenizer is byte-level BPE (lossless, no `<unk>`), with digits split individually and chat tokens reserved for later instruction tuning.
+- Losses are also reported as bits-per-byte so byte, 32k and 64k tokenizers can be compared fairly.
 
 ## Long-term hypothesis (NOT implemented)
 

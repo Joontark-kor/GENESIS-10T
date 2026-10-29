@@ -1,0 +1,64 @@
+{
+  "_comment": "Copy to configs/sources.json and edit. Every source needs a concrete license and a rights_basis. Paths are relative to the directory you run from. The pipeline records what you assert here; it cannot verify it.",
+  "sources": [
+    {
+      "name": "genesis-demo",
+      "type": "txt",
+      "path": "data/raw",
+      "doc_split": "line",
+      "license": "self-authored",
+      "rights_basis": "self-authored",
+      "language": "any",
+      "commercial_use": "yes",
+      "filters": {
+        "min_chars": 10,
+        "min_hangul_ratio": 0.0
+      }
+    },
+    {
+      "name": "kowiki",
+      "type": "jsonl",
+      "path": "data/raw/kowiki/**/wiki_*",
+      "text_field": "text",
+      "id_field": "id",
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attribution": "Wikipedia contributors, ko.wikipedia.org",
+      "rights_basis": "open-license",
+      "language": "ko",
+      "commercial_use": "yes",
+      "notes": "ShareAlike: redistributed derived text must keep CC BY-SA. Download kowiki-latest-pages-articles.xml.bz2 from dumps.wikimedia.org and extract with `wikiextractor --json` (files AA/wiki_00 ... are JSON lines)."
+    },
+    {
+      "name": "fineweb2-ko",
+      "type": "parquet",
+      "path": "data/raw/fineweb2/data/kor_Hang/train/*.parquet",
+      "text_field": "text",
+      "id_field": "id",
+      "license": "ODC-By-1.0",
+      "license_url": "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2",
+      "attribution": "HuggingFaceFW/fineweb-2",
+      "rights_basis": "open-license",
+      "language": "ko",
+      "commercial_use": "unknown",
+      "notes": "ODC-By covers the compilation; copyright in individual web pages is separate and is subject to CommonCrawl terms of use. Needs `pip install pyarrow`.",
+      "max_docs": 2000000
+    },
+    {
+      "name": "kr-statutes",
+      "type": "txt",
+      "path": "data/raw/law",
+      "license": "KR-Copyright-Act-Art7",
+      "license_url": "https://www.law.go.kr",
+      "attribution": "국가법령정보센터 (법제처)",
+      "rights_basis": "statutory-unprotected",
+      "language": "ko",
+      "commercial_use": "yes",
+      "notes": "One .txt per statute/ruling, official text only (e.g. via the 국가법령정보 공동활용 Open API). Statutes and court rulings are not protected works under Art. 7 of the Korean Copyright Act; publisher commentary can be.",
+      "filters": {
+        "min_chars": 50
+      },
+      "doc_split": "file"
+    }
+  ]
+}
