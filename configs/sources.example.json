@@ -1,0 +1,58 @@
+{
+  "_comment": "Copy to configs/sources.json and edit. Every source needs a concrete license and a rights_basis. Paths are relative to the directory you run from. The pipeline records what you assert here; it cannot verify it.",
+  "sources": [
+    {
+      "name": "genesis-demo",
+      "type": "txt",
+      "path": "data/raw",
+      "doc_split": "line",
+      "license": "self-authored",
+      "rights_basis": "self-authored",
+      "language": "any",
+      "commercial_use": "yes",
+      "filters": {"min_chars": 10, "min_hangul_ratio": 0.0}
+    },
+    {
+      "name": "kowiki",
+      "type": "jsonl",
+      "path": "data/raw/kowiki/*.jsonl.gz",
+      "text_field": "text",
+      "id_field": "id",
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attribution": "Wikipedia contributors, ko.wikipedia.org",
+      "rights_basis": "open-license",
+      "language": "ko",
+      "commercial_use": "yes",
+      "notes": "ShareAlike: redistributed derived text must keep CC BY-SA. Extract from the official dump (dumps.wikimedia.org) with wikiextractor or similar."
+    },
+    {
+      "name": "fineweb2-ko",
+      "type": "parquet",
+      "path": "data/raw/fineweb2/kor_Hang/train/*.parquet",
+      "text_field": "text",
+      "id_field": "id",
+      "license": "ODC-By-1.0",
+      "license_url": "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2",
+      "attribution": "HuggingFaceFW/fineweb-2",
+      "rights_basis": "open-license",
+      "language": "ko",
+      "commercial_use": "unknown",
+      "notes": "ODC-By covers the compilation; copyright in individual web pages is separate and is subject to CommonCrawl terms of use. Needs `pip install pyarrow`.",
+      "max_docs": 2000000
+    },
+    {
+      "name": "kr-statutes",
+      "type": "jsonl",
+      "path": "data/raw/law/*.jsonl",
+      "license": "KR-Copyright-Act-Art7",
+      "license_url": "https://www.law.go.kr",
+      "attribution": "국가법령정보센터 (법제처)",
+      "rights_basis": "statutory-unprotected",
+      "language": "ko",
+      "commercial_use": "yes",
+      "notes": "Statutes, ordinances and court rulings are not protected works under Art. 7 of the Korean Copyright Act. Commentary or annotations added by publishers can be protected; keep only the official text.",
+      "filters": {"min_chars": 50}
+    }
+  ]
+}
