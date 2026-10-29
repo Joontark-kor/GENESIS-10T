@@ -28,16 +28,20 @@ Each gate demands test evidence and measurement; no dates or expense guarantees.
 - [x] Tokens/sec, MFU, metrics.jsonl; val loss and bits-per-byte
 - [x] Single-node multi-GPU via DDP (torchrun)
 - [ ] **dense-100m on ~2B tokens**: smooth val bpb, verified resume on GPU, MFU ≥ 30%
-- [ ] Benchmark harness: HRET or lm-evaluation-harness on KoBEST / HAE-RAE / CLIcK (needs HF export)
-- [ ] KV cache for generation
+- [x] Hugging Face (Llama) export with logit-equality check; lm-evaluation-harness runs on it
+- [x] Benchmark item export for KoBEST / HAE-RAE / CLIcK / KMMLU + contamination workflow
+- [x] KV cache for generation
+- [ ] Measured KoBEST / HAE-RAE / CLIcK scores for dense-100m
 
 ## Gate 3: scaling evidence + distributed systems [NOT STARTED]
-- [ ] Scaling ladder 30M / 100M / 300M at fixed tokens-per-parameter; fit a mini scaling law
+- [x] Ladder tooling: run plan at fixed tokens-per-parameter, power-law fit, prediction, plot
+- [ ] Scaling ladder 40M / 100M / 300M executed; mini scaling law fitted
 - [ ] Dense vs MoE at equal active parameters (`dense-100m` vs `moe-8x-100m-active`)
 - [ ] FSDP2 sharding; MoE expert parallelism, capacity management, all-to-all transport
 - [ ] Checkpoint resharding, fault injection, distributed reproducibility
 
 ## Gate 4: serious training runs [NOT STARTED]
+- [x] Instruction-tuning path: chat template, masked SFT data, --init-from, chat generation
 - [ ] **GENESIS-1B-KO**: dense-1b on 20–50B tokens, then instruction tuning on licensed Korean data
 - [ ] Public release: weights, tokenizer, data card, training logs, evaluation + contamination report
 - [ ] Raise capital / research partnerships / managed cluster access for 7B → 30B+
