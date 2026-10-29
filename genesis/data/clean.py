@@ -81,7 +81,7 @@ def clean(sources: list[SourceSpec], output: Path, *, base_dir: Path | None = No
           quality: QualityConfig | None = None, val_fraction: float = 0.01,
           test_fraction: float = 0.01, near_dedup: bool = True, mask: bool = True,
           dedup_threshold: float = 0.8, docs_per_part: int = 50_000,
-          samples_per_reason: int = 3) -> dict:
+          samples_per_reason: int = 3, exclude_sha256: set[str] | None = None) -> dict:
     if not 0 <= val_fraction < 0.5 or not 0 <= test_fraction < 0.5:
         raise ValueError("val/test fractions must be in [0, 0.5)")
     quality = quality or QualityConfig()
@@ -120,6 +120,9 @@ def clean(sources: list[SourceSpec], output: Path, *, base_dir: Path | None = No
                     text, found = mask_pii(text)
                     stats["pii_masked"].update({k: v for k, v in found.items() if v})
                 sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+                if exclude_sha256 and sha in exclude_sha256:  # e.g. benchmark-contaminated docs
+                    stats["removed"]["blocklisted"] += 1
+                    continue
                 split = assign_split(sha, val_fraction, test_fraction)
                 writers[split].write({"id": doc["doc_id"], "source": spec.name, "sha256": sha, "text": text})
                 stats["kept"] += 1
@@ -137,6 +140,7 @@ def clean(sources: list[SourceSpec], output: Path, *, base_dir: Path | None = No
         "settings": {"quality": asdict(quality), "val_fraction": val_fraction,
                      "test_fraction": test_fraction, "near_dedup": near_dedup,
                      "dedup_threshold": dedup_threshold, "pii_masking": mask,
+                     "blocklisted_sha256": len(exclude_sha256 or ()),
                      "normalization": "NFC + newline/control/zero-width cleanup",
                      "split_method": "content-hash buckets after global dedup"},
         "sources": [{**spec.provenance(), "filters": spec.filters} for spec in sources],
@@ -195,10 +199,13 @@ def main() -> None:
     p.add_argument("--dedup-threshold", type=float, default=0.8)
     p.add_argument("--no-near-dedup", action="store_true")
     p.add_argument("--no-pii-mask", action="store_true")
+    p.add_argument("--exclude-sha256", type=Path, help="file of document hashes to drop (genesis.contamination)")
     args = p.parse_args()
+    exclude = set(args.exclude_sha256.read_text().split()) if args.exclude_sha256 else None
     manifest = clean(load_registry(args.sources), args.output, val_fraction=args.val_fraction,
                      test_fraction=args.test_fraction, near_dedup=not args.no_near_dedup,
-                     mask=not args.no_pii_mask, dedup_threshold=args.dedup_threshold)
+                     mask=not args.no_pii_mask, dedup_threshold=args.dedup_threshold,
+                     exclude_sha256=exclude)
     print(json.dumps({"splits": manifest["splits"], "statistics": manifest["statistics"]},
                      ensure_ascii=False, indent=2))
     print(f"data card: {args.output / 'DATA_CARD.md'}")
