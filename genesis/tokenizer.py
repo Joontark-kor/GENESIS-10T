@@ -108,6 +108,12 @@ class BPETokenizer:
         self.sha256 = file_sha256(self.path)
         self._special_ids = {self._tok.token_to_id(t) for t in SPECIAL_TOKENS} - {None}
 
+    def token_id(self, token: str) -> int:
+        token_id = self._tok.token_to_id(token)
+        if token_id is None:
+            raise KeyError(f"{token!r} is not in the tokenizer")
+        return token_id
+
     def encode(self, text: str, add_eos: bool = False) -> list[int]:
         ids = self._tok.encode(text, add_special_tokens=False).ids
         if add_eos:

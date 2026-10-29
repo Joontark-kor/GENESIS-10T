@@ -33,7 +33,8 @@ import torch
 import torch.distributed as dist
 
 from .config import ModelConfig
-from .data.shards import TokenSplit, read_manifest
+from .data.sft import open_split
+from .data.shards import read_manifest
 from .estimate import estimate, flops_per_token
 from .model import GenesisLM
 from .tokenizer import load_tokenizer
@@ -76,10 +77,13 @@ def atomic_save(obj: dict, path: Path) -> None:
 
 
 @torch.no_grad()
-def evaluate(model: GenesisLM, split: TokenSplit, seq_len: int, batch_size: int,
+def evaluate(model: GenesisLM, split, seq_len: int, batch_size: int,
              device: torch.device, byte_lengths: np.ndarray, max_tokens: int | None,
              autocast) -> dict[str, float]:
-    """Deterministic pass over (a prefix of) a split: mean loss and bits-per-byte."""
+    """Deterministic pass over (a prefix of) a split: mean loss and bits-per-byte.
+
+    Works for fixed pretraining windows and for variable-length SFT examples
+    (targets of -100 are padding or non-assistant tokens and are not scored)."""
     was_training = model.training
     model.eval()
     nll_sum, token_count, byte_count = 0.0, 0, 0
@@ -87,23 +91,26 @@ def evaluate(model: GenesisLM, split: TokenSplit, seq_len: int, batch_size: int,
 
     def flush() -> None:
         nonlocal nll_sum, token_count, byte_count
-        length = min(len(x) for x in batch_x)
-        x = torch.from_numpy(np.stack([a[:length] for a in batch_x])).to(device)
-        y_np = np.stack([b[:length] for b in batch_y])
+        length = max(len(x) for x in batch_x)
+        x_np = np.zeros((len(batch_x), length), dtype=np.int64)
+        y_np = np.full((len(batch_x), length), -100, dtype=np.int64)
+        for row, (a, b) in enumerate(zip(batch_x, batch_y)):
+            x_np[row, :len(a)] = a
+            y_np[row, :len(b)] = b
+        x = torch.from_numpy(x_np).to(device)
         y = torch.from_numpy(y_np).to(device)
         with autocast:
             logits = model(x)["logits"]
         nll = torch.nn.functional.cross_entropy(
-            logits.float().reshape(-1, logits.shape[-1]), y.reshape(-1), reduction="sum")
+            logits.float().reshape(-1, logits.shape[-1]), y.reshape(-1), reduction="sum", ignore_index=-100)
+        valid = y_np != -100
         nll_sum += nll.item()
-        token_count += y.numel()
-        byte_count += int(byte_lengths[y_np].sum())
+        token_count += int(valid.sum())
+        byte_count += int(byte_lengths[y_np[valid]].sum())
         batch_x.clear()
         batch_y.clear()
 
     for x, y in split.windows(seq_len, max_tokens):
-        if batch_x and len(x) != len(batch_x[0]):
-            flush()
         batch_x.append(x)
         batch_y.append(y)
         if len(batch_x) == batch_size:
@@ -140,6 +147,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--save-every", type=int, default=0, help="0 = only at the end")
     p.add_argument("--log-every", type=int, default=1)
     p.add_argument("--resume", action="store_true", help="continue from out-dir/ckpt_last.pt")
+    p.add_argument("--init-from", type=Path, default=None,
+                   help="start from these weights (e.g. a pretrained model.pt for SFT); optimizer starts fresh")
     p.add_argument("--stop-after", type=int, default=None,
                    help="exit after this step (schedule still targets --steps); for time-boxed jobs")
     p.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
@@ -186,8 +195,12 @@ def main(argv: list[str] | None = None) -> dict:
     tokenizer = load_tokenizer(tok_info["spec"], tok_info.get("sha256"))
     byte_lengths = np.zeros(config.vocab_size, dtype=np.int64)
     byte_lengths[:tokenizer.vocab_size] = tokenizer.token_byte_lengths()
-    train_split = TokenSplit(args.data, "train")
-    val_split = TokenSplit(args.data, "val")
+    train_split = open_split(args.data, "train")
+    val_split = open_split(args.data, "val")
+    stage = manifest.get("stage", "pretrain")
+    if stage == "sft" and manifest["max_length"] > config.context_length + 1:
+        raise ValueError(f"SFT data allows {manifest['max_length']} tokens per example but the model's "
+                         f"context is {config.context_length}; rebuild with --max-length {config.context_length + 1}")
 
     torch.manual_seed(args.seed)
     model = GenesisLM(config).to(device)
@@ -213,8 +226,18 @@ def main(argv: list[str] | None = None) -> dict:
         start_step = state["step"]
         if master:
             print(f"resumed from {last_path} at step {start_step}", flush=True)
-    elif master and metrics_path.exists():
-        metrics_path.unlink()
+    else:
+        if args.init_from is not None:
+            init = torch.load(args.init_from, map_location=device, weights_only=True)
+            if init["config"] != asdict(config):
+                raise ValueError("--init-from checkpoint has a different model config")
+            if (init.get("tokenizer") or {}).get("sha256") != tok_info.get("sha256"):
+                raise ValueError("--init-from checkpoint was trained with a different tokenizer")
+            raw_model.load_state_dict(init["model_state"])
+            if master:
+                print(f"initialized weights from {args.init_from} (step {init.get('step')})", flush=True)
+        if master and metrics_path.exists():
+            metrics_path.unlink()
 
     if args.compile:
         model = torch.compile(model)
@@ -236,6 +259,7 @@ def main(argv: list[str] | None = None) -> dict:
             "tokenizer": tok_info, "parameters": n_params,
             "non_embedding_active_parameters": counts["non_embedding_active_parameters"],
             "active_parameters": counts["approx_active_parameters_per_token"],
+            "stage": stage, "init_from": str(args.init_from) if args.init_from else None,
             "tokens_per_step": tokens_per_step, "steps": args.steps, "world_size": world,
             "train_tokens_available": train_split.total, "lr": args.lr, "seed": args.seed,
             "device": str(device), "bf16": use_bf16,
@@ -261,6 +285,7 @@ def main(argv: list[str] | None = None) -> dict:
     last_val = None
     step = start_step
     window_start, window_steps, excluded = time.perf_counter(), 0, 0.0
+    window_tokens = 0  # tokens actually processed (SFT batches are shorter than the context)
     last_step = min(args.steps, args.stop_after) if args.stop_after else args.steps
     for step in range(start_step + 1, last_step + 1):
         lr = lr_at(step, args.lr, warmup, args.steps, args.min_lr_ratio)
@@ -271,6 +296,7 @@ def main(argv: list[str] | None = None) -> dict:
         loads = None
         for micro in range(args.grad_accum):
             x_np, y_np = train_split.sample(batch_rng(args.seed, rank, step, micro), args.batch_size, seq_len)
+            window_tokens += x_np.size * world
             x = torch.from_numpy(x_np).to(device, non_blocking=True)
             y = torch.from_numpy(y_np).to(device, non_blocking=True)
             sync = nullcontext()
@@ -297,7 +323,7 @@ def main(argv: list[str] | None = None) -> dict:
             if use_cuda:
                 torch.cuda.synchronize()
             elapsed = time.perf_counter() - window_start - excluded
-            tok_s = tokens_per_step * window_steps / max(elapsed, 1e-9)
+            tok_s = window_tokens / max(elapsed, 1e-9)
             record = {"step": step, "lr": lr, "train_loss": lm_total, "grad_norm": grad_norm,
                       "tokens_per_s": tok_s, "tokens_seen": step * tokens_per_step}
             if config.is_moe:
@@ -314,6 +340,7 @@ def main(argv: list[str] | None = None) -> dict:
                 print(f"step {step}/{args.steps} loss={lm_total:.4f} lr={lr:.2e} "
                       f"gnorm={grad_norm:.2f} tok/s={tok_s:,.0f}{extra}", flush=True)
             window_start, window_steps, excluded = time.perf_counter(), 0, 0.0
+            window_tokens = 0
 
         if step % args.eval_every == 0 or step == args.steps:
             pause = time.perf_counter()

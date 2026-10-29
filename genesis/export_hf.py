@@ -23,6 +23,7 @@ import shutil
 import torch
 
 from .config import ModelConfig
+from .chat import HF_CHAT_TEMPLATE
 from .tokenizer import EOS_TOKEN
 
 PAD_TOKEN = "<|pad|>"
@@ -126,6 +127,7 @@ def export(checkpoint_path: Path, output: Path, verify: bool = True) -> Path:
         "eos_token": EOS_TOKEN, "pad_token": PAD_TOKEN, "bos_token": None, "unk_token": None,
         "model_max_length": config.context_length,
         "add_bos_token": False, "add_eos_token": False, "clean_up_tokenization_spaces": False,
+        "chat_template": HF_CHAT_TEMPLATE,
     }, indent=2), encoding="utf-8")
     (output / "special_tokens_map.json").write_text(json.dumps(
         {"eos_token": EOS_TOKEN, "pad_token": PAD_TOKEN}, indent=2), encoding="utf-8")
