@@ -34,7 +34,7 @@ import torch.distributed as dist
 
 from .config import ModelConfig
 from .data.shards import TokenSplit, read_manifest
-from .estimate import flops_per_token
+from .estimate import estimate, flops_per_token
 from .model import GenesisLM
 from .tokenizer import load_tokenizer
 
@@ -230,6 +230,16 @@ def main(argv: list[str] | None = None) -> dict:
         print(f"device={device} world={world} bf16={use_bf16} params={n_params:,} "
               f"tokenizer={tok_info['type']}({tokenizer.vocab_size}) train_tokens={train_split.total:,} "
               f"tokens/step={tokens_per_step:,} warmup={warmup}", flush=True)
+        counts = estimate(config)
+        (args.out_dir / "run.json").write_text(json.dumps({
+            "config_path": str(args.config), "config": asdict(config), "data": str(args.data),
+            "tokenizer": tok_info, "parameters": n_params,
+            "non_embedding_active_parameters": counts["non_embedding_active_parameters"],
+            "active_parameters": counts["approx_active_parameters_per_token"],
+            "tokens_per_step": tokens_per_step, "steps": args.steps, "world_size": world,
+            "train_tokens_available": train_split.total, "lr": args.lr, "seed": args.seed,
+            "device": str(device), "bf16": use_bf16,
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def log(record: dict) -> None:
         if master:
