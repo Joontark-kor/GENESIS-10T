@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import re
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -27,6 +28,9 @@ from pathlib import Path
 from ..data.clean import assign_split
 from ..tokenizer import file_sha256
 from .dart import DartClient, QuotaExceeded
+
+# Special purpose acquisition companies have no operating business to analyse.
+EXCLUDE_NAME = re.compile(r"스팩|기업인수목적")
 
 METRICS = ("revenue", "operating_income", "net_income", "total_assets", "total_liabilities", "total_equity")
 
@@ -219,6 +223,9 @@ def build(out: Path, langs: list[str], val_fraction: float = 0.1, test_fraction:
     companies: dict[str, set] = {"train": set(), "val": set(), "test": set()}
     try:
         for record in records:
+            if EXCLUDE_NAME.search(record.get("corp_name", "")):
+                counts["excluded:spac"] += 1
+                continue
             split = company_split(record["corp_code"], val_fraction, test_fraction)
             companies[split].add(record["corp_code"])
             for lang in langs:
@@ -242,7 +249,7 @@ def build(out: Path, langs: list[str], val_fraction: float = 0.1, test_fraction:
     manifest = {
         "stage": "applied-fin-tasks", "created_at": datetime.now(timezone.utc).isoformat(),
         "records": len(records), "records_sha256": file_sha256(records_path), "langs": langs,
-        "split_by": "company (corp_code hash)", "companies": {k: len(v) for k, v in companies.items()},
+        "split_by": "company (corp_code hash)", "excluded": {"spac_records": counts.pop("excluded:spac", 0)}, "companies": {k: len(v) for k, v in companies.items()},
         "tasks": dict(sorted(counts.items())),
         "source": {"name": "OpenDART fnlttSinglAcntAll", "url": "https://opendart.fss.or.kr",
                    "license": "OpenDART 이용약관", "rights_basis": "contract",

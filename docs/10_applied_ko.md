@@ -61,6 +61,20 @@ cat data/applied/fin_v1/manifest.json
 
 ## 3. GPU에서: 기준선 → 학습 → 비교
 
+**가장 쉬운 방법: Google Colab.** `notebooks/applied_colab.ipynb`가 아래 과정을 셀 단위로 담고 있다.
+
+1. 집 PC에서 과제 파일을 묶어 Windows 다운로드 폴더로 복사한다(캐시는 포함되지 않음).
+   ```bash
+   cd ~/work/GENESIS-10T && python -c "import shutil; shutil.make_archive('fin_v1','zip','data/applied','fin_v1')"
+   cp fin_v1.zip /mnt/c/Users/<윈도우사용자>/Downloads/
+   ```
+2. Google Drive에 `genesis` 폴더를 만들고 `fin_v1.zip`을 올린다. DART 데이터는 공개 저장소에 올리지 않는다.
+3. https://colab.research.google.com → GitHub 탭 → `Joontark-kor/GENESIS-10T` → `notebooks/applied_colab.ipynb`를 연다.
+4. 런타임 → 런타임 유형 변경 → **L4 GPU**(유료 플랜) 또는 T4(무료, 느림) → 위에서부터 셀을 실행한다.
+5. 결과는 Drive의 `genesis/results/`에 저장된다.
+
+**직접 서버를 빌리는 방법:**
+
 QLoRA 8B는 24GB급 GPU 1장(L4, A10G, RTX 4090 등)이면 된다. 클라우드에서 Ubuntu GPU 서버를 빌려 저장소를 받고 `pip install -e ".[applied,qlora]"`, 그리고 `data/applied/fin_v1`을 `rsync`로 보낸다(런북 8단계와 같은 방법).
 
 ```bash

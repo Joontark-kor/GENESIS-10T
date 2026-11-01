@@ -119,3 +119,14 @@ def test_company_split_is_stable():
     assert company_split("00126380") == company_split("00126380")
     splits = [company_split(f"{i:08d}") for i in range(2000)]
     assert 0.05 < splits.count("test") / 2000 < 0.15
+
+
+def test_spacs_are_excluded(tmp_path: Path):
+    out = tmp_path / "fin"
+    out.mkdir()
+    records = [_record(code="00000001", name="가나전자"), _record(code="00000002", name="하나금융제30호스팩"),
+               _record(code="00000003", name="미래에셋비전기업인수목적2호")]
+    (out / "records.jsonl").write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records), encoding="utf-8")
+    manifest = build(out, ["ko"])
+    assert manifest["excluded"] == {"spac_records": 2}
+    assert sum(manifest["companies"].values()) == 1
