@@ -59,4 +59,9 @@ def test_report_fits_dense_and_lists_moe(tmp_path):
     moe = next(r for r in result["runs"] if r["name"] == "moe")
     assert moe["val_bpb"] < moe["dense_fit_bpb_at_same_N"]
     assert result["predictions"][0]["predicted_val_bpb"] < min(r["val_bpb"] for r in result["runs"])
-    assert (tmp_path / "plot.png").exists()
+    try:
+        import matplotlib  # noqa: F401  (optional: the plot is skipped without it)
+    except ImportError:
+        assert not (tmp_path / "plot.png").exists()
+    else:
+        assert (tmp_path / "plot.png").exists()
