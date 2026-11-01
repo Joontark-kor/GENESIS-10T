@@ -4,6 +4,8 @@
 >
 > **Near-term target: GENESIS-1B-KO** — a ~1B-parameter Korean-first model trained from scratch on data whose license is tracked per document, released with its data card, tokenizer and reproduction scripts.
 >
+> **Career track: GENESIS-Applied** — open models fine-tuned with LoRA/QLoRA for Korean/Japanese corporate-finance analysis (reading filings, computing and checking ratios), published with accuracy, cost and speed. See [docs/10_applied_ko.md](docs/10_applied_ko.md).
+>
 > **Actually implemented:** the full small-scale pipeline (data registry → cleaning → Korean BPE → token shards → dense/MoE training with DDP → evaluation). No large model has been trained yet.
 
 ## Objective
@@ -33,7 +35,7 @@ The demo corpus is tiny, so generation is nonsense; the point is that every stag
 
 ## The real pipeline
 
-Guides (Korean): [data → training](docs/02_pipeline_ko.md) · [next steps](docs/03_next_steps_ko.md) · [benchmarks](docs/04_benchmarks_ko.md) · [instruction tuning](docs/05_sft_ko.md).
+Guides (Korean): [data → training](docs/02_pipeline_ko.md) · [next steps](docs/03_next_steps_ko.md) · [benchmarks](docs/04_benchmarks_ko.md) · [instruction tuning](docs/05_sft_ko.md) · [GENESIS-Applied](docs/10_applied_ko.md).
 
 ```bash
 # A. sources -> normalized, filtered, PII-masked, deduplicated, split text (+ DATA_CARD.md)
@@ -68,6 +70,7 @@ python -m genesis.contamination --train data/clean/v1 --benchmark bench.jsonl --
 | `genesis/bench_to_jsonl.py` | KoBEST / HAE-RAE / CLIcK / KMMLU items for contamination checks |
 | `genesis/ladder.py` | Scaling-ladder run plan, power-law fit, plot, prediction |
 | `genesis/chat.py`, `genesis/data/sft.py` | Chat format and instruction-tuning data with assistant-only loss |
+| `genesis/applied/` | OpenDART client, financial tasks with computed answers, LoRA/QLoRA fine-tuning, accuracy/speed/cost evaluation |
 | `configs/` | `debug`, `ko-tiny-cpu`, `dense-40m`, `dense-100m`, `moe-8x-100m-active`, `dense-300m`, `dense-1b`, `sources.example.json` |
 
 ## Data governance

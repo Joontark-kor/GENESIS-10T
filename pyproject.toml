@@ -15,6 +15,8 @@ dev = ["pytest>=7.0", "matplotlib>=3.7"]
 parquet = ["pyarrow>=14"]
 export = ["transformers>=4.45", "safetensors>=0.4"]
 eval = ["transformers>=4.45", "safetensors>=0.4", "lm_eval>=0.4.5", "accelerate", "datasets"]
+applied = ["transformers>=4.45", "safetensors>=0.4", "peft>=0.13", "accelerate"]
+qlora = ["bitsandbytes>=0.43"]
 
 [tool.setuptools.packages.find]
 where = ["."]
