@@ -1,7 +1,27 @@
 # Roadmap — gates to a trainable frontier-scale model
 
-Near-term target: **GENESIS-1B-KO** (Gate 4 entry). The 10T experiment stays the north star.
+Priority: **Track A (GENESIS-Applied)**. Track B keeps pretraining as a learning track; GENESIS-1B-KO and the 10T experiment stay long-term goals.
 Each gate demands test evidence and measurement; no dates or expense guarantees.
+
+## Track A — GENESIS-Applied (priority, career track)
+Specialise open models for Korean/Japanese corporate finance with LoRA/QLoRA; publish accuracy, cost and speed.
+
+### A1: data and tasks [CODE DONE — needs DART key]
+- [x] OpenDART client (cached, resumable, quota-aware) and statement normalisation
+- [x] Extraction and ratio tasks with computed answers; company-level splits; ko/ja templates
+- [ ] Collect 300 listed companies × 2023–2025 and review the task manifest
+
+### A2: baseline and first fine-tune [CODE DONE — needs GPU]
+- [x] LoRA/QLoRA trainer on any chat template (assistant-only loss), run records
+- [x] Evaluator: accuracy by task, seconds/item, tokens/s, cost per 1,000 items
+- [ ] Baseline vs fin-v1 on the held-out companies, small model then 8B
+
+### A3: Korean + Japanese, public release [NOT STARTED]
+- [ ] EDINET collector and Japanese tasks; KMMLU finance subjects, Japanese Financial Benchmark, KRX-Bench
+- [ ] Multi-year trend and peer-comparison tasks
+- [ ] Hugging Face release: adapter, model card, evaluation report, data card
+
+## Track B — pretraining from scratch (learning track)
 
 ## Gate 0: executable engineering baseline [DONE]
 - [x] Self-authored sample data and provenance manifest
@@ -18,8 +38,8 @@ Each gate demands test evidence and measurement; no dates or expense guarantees.
 - [x] Contamination check against benchmark items + blocklist rebuild
 - [x] Byte-level BPE with NFC, per-digit split, reserved chat tokens; tokens-per-syllable report
 - [x] Data card and manifests pinned by hash (clean → tokenizer → shards → checkpoint)
-- [ ] **Assemble a real corpus** (Korean Wikipedia, statutes, FineWeb2-ko, ...) and review its data card
-- [ ] Train `ko32k-v1` on it and record the byte-vs-BPE report
+- [x] **Assemble a real corpus**: Korean Wikipedia 2026-11-01, 510,989 docs / 0.62B chars after cleaning, data card reviewed
+- [x] Train `ko32k-v1`: 0.72 tokens per Hangul syllable vs 3.57 for bytes, 100% round trip
 - [ ] Legal/privacy review of the source list
 
 ## Gate 2: efficient single-node training [CODE DONE — needs GPU runs]
