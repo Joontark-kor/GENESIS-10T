@@ -5,7 +5,9 @@
         --output runs/applied/qwen3-8b-fin-v1 --qlora --epochs 2
 
 ``--qlora`` loads the base model in 4-bit (bitsandbytes, NVIDIA GPU) so an
-8B model trains on one 24 GB card; without it LoRA trains on a bf16/fp32 copy.
+8B model trains on one 24 GB card; without it LoRA trains on a bf16/fp16/fp32 copy.
+Precision follows the GPU: bf16 on Ampere or newer (A100, L4), fp16 on
+older cards such as the free-Colab T4, fp32 on CPU.
 The output folder holds the adapter, the tokenizer and ``run.json``
 (base model and revision, data hashes, settings, time, peak memory, trainable
 parameters). Check the base model's license on its model card before
@@ -20,6 +22,7 @@ import math
 from pathlib import Path
 import time
 
+from ..precision import describe, native_bf16
 from ..tokenizer import file_sha256
 from .chatdata import Collator, encode_example, load_jsonl
 
@@ -80,7 +83,8 @@ def main(argv: list[str] | None = None) -> dict:
     set_seed(args.seed)
     template_kwargs = json.loads(args.template_kwargs)
     use_cuda = torch.cuda.is_available() and not args.cpu
-    use_bf16 = use_cuda and torch.cuda.is_bf16_supported()
+    use_bf16 = native_bf16(torch, use_cuda)
+    use_fp16 = use_cuda and not use_bf16
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, revision=args.revision)
     if tokenizer.chat_template is None:
@@ -103,6 +107,7 @@ def main(argv: list[str] | None = None) -> dict:
         load_kwargs["quantization_config"] = BitsAndBytesConfig(
             load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
             bnb_4bit_compute_dtype=torch.bfloat16 if use_bf16 else torch.float16)
+    # fp16 runs keep fp32 master weights (LoRA params must not be fp16 under the fp16 grad scaler)
     load_kwargs["dtype"] = torch.bfloat16 if use_bf16 else torch.float32
     if use_cuda:
         load_kwargs["device_map"] = "auto"
@@ -128,7 +133,7 @@ def main(argv: list[str] | None = None) -> dict:
         lr_scheduler_type="cosine", warmup_steps=max(1, int(total_steps * args.warmup_ratio)),
         logging_steps=args.logging_steps, save_steps=args.save_steps, save_total_limit=2,
         eval_strategy="steps" if val_examples else "no", eval_steps=args.eval_steps,
-        bf16=use_bf16, use_cpu=not use_cuda, report_to="none", remove_unused_columns=False,
+        bf16=use_bf16, fp16=use_fp16, use_cpu=not use_cuda, report_to="none", remove_unused_columns=False,
         optim="paged_adamw_8bit" if args.qlora else "adamw_torch", seed=args.seed,
         gradient_checkpointing=False, label_names=["labels"])
     trainer = Trainer(model=model, args=training_args, train_dataset=train_examples,
@@ -152,7 +157,7 @@ def main(argv: list[str] | None = None) -> dict:
     run = {
         "created_at": datetime.now(timezone.utc).isoformat(), "stage": "adapt-finetune",
         "base_model": args.base_model, "base_revision": base_revision,
-        "method": "QLoRA (4-bit nf4)" if args.qlora else "LoRA",
+        "method": "QLoRA (4-bit nf4)" if args.qlora else "LoRA", "precision": describe(torch, use_cuda),
         "settings": {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()},
         "data": {"train": train_stats, "val": val_stats},
         "trainable_parameters": trainable, "total_parameters": total,

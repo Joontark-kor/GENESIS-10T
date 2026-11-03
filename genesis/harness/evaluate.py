@@ -36,6 +36,7 @@ import time
 from genesis import __version__ as GENESIS_VERSION
 from genesis.adapt.chatdata import load_jsonl, render
 from genesis.harness.scorers import is_correct, parse_number, resolve  # noqa: F401  (re-exported)
+from genesis.precision import describe, inference_dtype
 from genesis.tokenizer import file_sha256
 
 REPORT_VERSION = 1
@@ -79,7 +80,8 @@ class LocalGenerator:
         self.template_kwargs = json.loads(args.template_kwargs)
         self.max_new_tokens = args.max_new_tokens
         self.use_cuda = torch.cuda.is_available() and not args.cpu
-        dtype = torch.bfloat16 if self.use_cuda and torch.cuda.is_bf16_supported() else torch.float32
+        dtype = inference_dtype(torch, self.use_cuda)
+        self.precision = describe(torch, self.use_cuda)
         tokenizer = AutoTokenizer.from_pretrained(args.adapter or args.model)
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -185,7 +187,8 @@ def run(args) -> dict:
                  if args.gpu_hour_price else None},
         "hardware": generator.hardware,
         "settings": {"max_new_tokens": args.max_new_tokens, "decoding": "greedy", "scorer": default_scorer,
-                     "template_kwargs": json.loads(args.template_kwargs), "load_4bit": args.load_4bit},
+                     "template_kwargs": json.loads(args.template_kwargs), "load_4bit": args.load_4bit,
+                     "precision": getattr(generator, "precision", None)},
         "rows": rows,
     }
     if args.out:

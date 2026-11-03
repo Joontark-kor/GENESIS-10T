@@ -151,3 +151,18 @@ def test_safety_interface(monkeypatch):
         load_safety_check("no_colon")
     with pytest.raises(TypeError):
         load_safety_check("tests.test_serving_safety:_FakeOpenAI")
+
+
+def test_precision_follows_compute_capability():
+    import types
+
+    from genesis.precision import describe, inference_dtype, native_bf16
+    torch = pytest.importorskip("torch")
+
+    def fake(cap):
+        return types.SimpleNamespace(cuda=types.SimpleNamespace(get_device_capability=lambda: cap),
+                                     bfloat16=torch.bfloat16, float16=torch.float16, float32=torch.float32)
+
+    assert native_bf16(fake((8, 9)), True) and not native_bf16(fake((7, 5)), True)   # L4 vs T4
+    assert inference_dtype(fake((7, 5)), True) is torch.float16 and describe(fake((8, 0)), True) == "bf16"
+    assert inference_dtype(fake((8, 0)), False) is torch.float32 and describe(fake((7, 5)), False) == "fp32"
