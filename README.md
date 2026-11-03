@@ -4,7 +4,7 @@
 >
 > **Near-term target: GENESIS-1B-KO** — a ~1B-parameter Korean-first model trained from scratch on data whose license is tracked per document, released with its data card, tokenizer and reproduction scripts.
 >
-> **Career track: GENESIS-Applied** — open models fine-tuned with LoRA/QLoRA for Korean corporate-finance analysis on OpenDART filings (reading filings, computing and checking ratios), published with accuracy, cost and speed. See [docs/10_applied_ko.md](docs/10_applied_ko.md).
+> **Practical track: GENESIS core + domain adapters** — an open base model, the GENESIS core (data, LoRA/QLoRA, one evaluation-report format, an OpenAI-compatible serving contract, a safety-check interface) and per-domain adapters. The first domain is `genesis_fin`: Korean corporate-finance analysis on OpenDART filings, published with accuracy, cost and speed. See [docs/11_core_ko.md](docs/11_core_ko.md) and [docs/10_fin_ko.md](docs/10_fin_ko.md).
 >
 > **Actually implemented:** the full small-scale pipeline (data registry → cleaning → Korean BPE → token shards → dense/MoE training with DDP → evaluation). No large model has been trained yet.
 
@@ -35,7 +35,7 @@ The demo corpus is tiny, so generation is nonsense; the point is that every stag
 
 ## The real pipeline
 
-Guides (Korean): [data → training](docs/02_pipeline_ko.md) · [next steps](docs/03_next_steps_ko.md) · [benchmarks](docs/04_benchmarks_ko.md) · [instruction tuning](docs/05_sft_ko.md) · [GENESIS-Applied](docs/10_applied_ko.md).
+Guides (Korean): [data → training](docs/02_pipeline_ko.md) · [next steps](docs/03_next_steps_ko.md) · [benchmarks](docs/04_benchmarks_ko.md) · [instruction tuning](docs/05_sft_ko.md) · [core contract](docs/11_core_ko.md) · [genesis-fin](docs/10_fin_ko.md).
 
 ```bash
 # A. sources -> normalized, filtered, PII-masked, deduplicated, split text (+ DATA_CARD.md)
@@ -70,7 +70,11 @@ python -m genesis.contamination --train data/clean/v1 --benchmark bench.jsonl --
 | `genesis/bench_to_jsonl.py` | KoBEST / HAE-RAE / CLIcK / KMMLU items for contamination checks |
 | `genesis/ladder.py` | Scaling-ladder run plan, power-law fit, plot, prediction |
 | `genesis/chat.py`, `genesis/data/sft.py` | Chat format and instruction-tuning data with assistant-only loss |
-| `genesis/applied/` | OpenDART client, financial tasks with computed answers, LoRA/QLoRA fine-tuning, accuracy/speed/cost evaluation |
+| `genesis/adapt/` | LoRA/QLoRA fine-tuning of an open base model on chat data (assistant-only loss), `run.json` provenance |
+| `genesis/harness/` | One evaluation-report format for every model/adapter: accuracy, speed, cost, contamination; local or served models |
+| `genesis/serving/` | OpenAI-compatible endpoint client and vLLM multi-LoRA command; apps call the endpoint, not model code |
+| `genesis/safety.py` | Safety-check interface only (input/output verdicts, loader, guarded call); implementations live with each application |
+| `genesis_fin/` | Domain package: OpenDART client and financial tasks with computed answers. Depends on `genesis`; never the reverse |
 | `configs/` | `debug`, `ko-tiny-cpu`, `dense-40m`, `dense-100m`, `moe-8x-100m-active`, `dense-300m`, `dense-1b`, `sources.example.json` |
 
 ## Data governance
@@ -82,6 +86,7 @@ Use only datasets you own or whose terms permit the intended training and redist
 - No FSDP/tensor/pipeline/expert parallelism yet: DDP only, so models must fit on one GPU (≈ up to 1B on 80 GB).
 - MoE routing is a single-device loop, correct but not fast.
 - MoE checkpoints cannot be exported to Hugging Face yet; no preference tuning (DPO) or safety evaluation yet.
+- The core defines the safety-check interface but ships no screening rules; an application without its own check runs with `AllowAll`, which reports that no check ran.
 - Never infer quality from parameter count alone; verify against held-out benchmarks.
 
 License for **code**: MIT. Dataset licensing must be evaluated separately.

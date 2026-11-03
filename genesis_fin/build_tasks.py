@@ -1,11 +1,11 @@
 """Financial-statement tasks with computed answers, from OpenDART data.
 
     # 1) collect normalized statements (needs DART_API_KEY; cached, resumable)
-    python -m genesis.applied.build_fin_tasks fetch --years 2023 2024 2025 \
+    python -m genesis_fin.build_tasks fetch --years 2023 2024 2025 \
         --companies 400 --out data/applied/fin_v1
 
     # 2) turn them into training conversations and evaluation items
-    python -m genesis.applied.build_fin_tasks build --out data/applied/fin_v1 --langs ko
+    python -m genesis_fin.build_tasks build --out data/applied/fin_v1 --langs ko
 
 Every answer is computed from the numbers shown in the question, so accuracy
 is checked by arithmetic, not by judgement. Companies (not rows) are split
@@ -25,8 +25,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from ..data.clean import assign_split
-from ..tokenizer import file_sha256
+from genesis.data.clean import assign_split
+from genesis.tokenizer import file_sha256
 from .dart import DartClient, QuotaExceeded
 
 # Special purpose acquisition companies have no operating business to analyse.

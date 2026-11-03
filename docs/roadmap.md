@@ -1,15 +1,22 @@
 # Roadmap — gates to a trainable frontier-scale model
 
-Priority: **Track A (GENESIS-Applied)**. Track B keeps pretraining as a learning track; GENESIS-1B-KO and the 10T experiment stay long-term goals.
+Priority: **Track A (GENESIS core + genesis-fin)**. Track B keeps pretraining as a learning track; GENESIS-1B-KO and the 10T experiment stay long-term goals.
 Each gate demands test evidence and measurement; no dates or expense guarantees.
 
-## Track A — GENESIS-Applied (priority, career track)
-Specialise open models for **Korean** corporate finance (OpenDART filings) with LoRA/QLoRA; publish accuracy, cost and speed. Japan is an optional later extension.
+## Track A — GENESIS core + genesis-fin (priority, practical track)
+An open base model + the GENESIS core (see [11_core_ko.md](11_core_ko.md)) + domain adapters. First domain: **Korean** corporate finance (OpenDART filings) with LoRA/QLoRA; publish accuracy, cost and speed. Japan is an optional later extension.
+
+### Core v0.2.0: the standard as a contract [CODE DONE]
+- [x] Package split: core `genesis/` (adapt, harness, serving, safety) and domain `genesis_fin/`; tests enforce core → domain only
+- [x] One evaluation-report format (`report_version` 1): accuracy, speed, cost, contamination; local, adapter or served model
+- [x] Serving contract: OpenAI-compatible endpoint client and vLLM multi-LoRA command; apps never import model code
+- [x] Safety-check interface only (input/output verdicts, loader, guarded call); no screening rules in the core
+- [ ] Served evaluation matches local evaluation for the same adapter (needs GPU)
 
 ### A1: data and tasks [CODE DONE — needs DART key]
 - [x] OpenDART client (cached, resumable, quota-aware) and statement normalisation
 - [x] Extraction and ratio tasks with computed answers; company-level splits
-- [ ] Collect 300 listed companies × 2023–2025 and review the task manifest
+- [x] Collect 300 listed companies × 2023–2025 and review the task manifest (rebuild after the SPAC exclusion)
 
 ### A2: baseline and first fine-tune [CODE DONE — needs GPU]
 - [x] LoRA/QLoRA trainer on any chat template (assistant-only loss), run records

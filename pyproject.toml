@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "genesis-10t"
 version = "0.2.0"
-description = "Research-oriented foundation model project: from data to a scalable Mixture-of-Experts Transformer"
+description = "GENESIS: a Korean-first foundation-model core (data, training, adapters, evaluation harness, serving contract) and research toward a scalable MoE Transformer"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["torch>=2.2", "numpy>=1.24", "tokenizers>=0.15"]
@@ -15,6 +15,9 @@ dev = ["pytest>=7.0", "matplotlib>=3.7"]
 parquet = ["pyarrow>=14"]
 export = ["transformers>=4.45", "safetensors>=0.4"]
 eval = ["transformers>=4.45", "safetensors>=0.4", "lm_eval>=0.4.5", "accelerate", "datasets"]
+adapt = ["transformers>=4.45", "safetensors>=0.4", "peft>=0.13", "accelerate"]
+fin = ["transformers>=4.45", "safetensors>=0.4", "peft>=0.13", "accelerate"]
+# "applied" is the pre-0.2.0 name of "fin"; kept so old install commands still work
 applied = ["transformers>=4.45", "safetensors>=0.4", "peft>=0.13", "accelerate"]
 qlora = ["bitsandbytes>=0.43"]
 

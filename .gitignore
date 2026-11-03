@@ -12,3 +12,5 @@ data/clean/
 data/tokens/
 reports/
 runs/
+build/
+dist/

@@ -1,6 +1,6 @@
 """LoRA / QLoRA fine-tuning of an open model on chat data (assistant-only loss).
 
-    python -m genesis.applied.finetune --base-model Qwen/Qwen3-8B \
+    python -m genesis.adapt.finetune --base-model Qwen/Qwen3-8B \
         --train data/applied/fin_v1/sft_train.jsonl --val data/applied/fin_v1/sft_val.jsonl \
         --output runs/applied/qwen3-8b-fin-v1 --qlora --epochs 2
 
@@ -150,7 +150,7 @@ def main(argv: list[str] | None = None) -> dict:
         tokenizer.save_pretrained(args.output / "merged")
     base_revision = getattr(model.base_model.model.config, "_commit_hash", None) or args.revision
     run = {
-        "created_at": datetime.now(timezone.utc).isoformat(), "stage": "applied-finetune",
+        "created_at": datetime.now(timezone.utc).isoformat(), "stage": "adapt-finetune",
         "base_model": args.base_model, "base_revision": base_revision,
         "method": "QLoRA (4-bit nf4)" if args.qlora else "LoRA",
         "settings": {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()},

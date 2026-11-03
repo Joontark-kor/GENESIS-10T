@@ -1,4 +1,6 @@
-# GENESIS-Applied: 공개 모델을 한국 기업 재무 분석에 특화하기
+# genesis-fin: 공개 모델을 한국 기업 재무 분석에 특화하기
+
+> v0.2.0부터 금융 코드는 `genesis_fin/`에, 학습·평가는 GENESIS 코어(`genesis.adapt`, `genesis.harness`)에 있다. 구조는 [11_core_ko.md](11_core_ko.md). 데이터 경로(`data/applied/`)는 기존 캐시를 그대로 쓰려고 바꾸지 않았다.
 
 **목표:** 공개 LLM을 LoRA/QLoRA로 학습해, 한국 상장사의 공시(OpenDART) 재무제표에서 숫자를 정확히 읽고 재무비율을 계산·검증하는 모델을 만든다. 일본(EDINET)은 한국 결과가 나온 뒤의 선택 확장이다. 릴리스마다 **정확도·비용·속도**를 같은 형식으로 공개한다.
 
@@ -36,14 +38,14 @@ OpenDART ──fetch──▶ records.jsonl ──build──▶ sft_train / sft
 3. 패키지 설치
    ```bash
    cd ~/work/GENESIS-10T && source .venv/bin/activate && git checkout main && git pull
-   pip install -e ".[applied]"
+   pip install -e ".[fin]"
    ```
 
 ## 1. 데이터 수집과 과제 만들기 (집 PC, CPU로 충분)
 
 ```bash
-python -m genesis.applied.build_fin_tasks fetch --years 2023 2024 2025 --companies 300 --out data/applied/fin_v1
-python -m genesis.applied.build_fin_tasks build --out data/applied/fin_v1 --langs ko
+python -m genesis_fin.build_tasks fetch --years 2023 2024 2025 --companies 300 --out data/applied/fin_v1
+python -m genesis_fin.build_tasks build --out data/applied/fin_v1 --langs ko
 cat data/applied/fin_v1/manifest.json
 ```
 
@@ -61,7 +63,7 @@ cat data/applied/fin_v1/manifest.json
 
 ## 3. GPU에서: 기준선 → 학습 → 비교
 
-**가장 쉬운 방법: Google Colab.** `notebooks/applied_colab.ipynb`가 아래 과정을 셀 단위로 담고 있다.
+**가장 쉬운 방법: Google Colab.** `notebooks/fin_colab.ipynb`가 아래 과정을 셀 단위로 담고 있다.
 
 1. 집 PC에서 과제 파일을 묶어 Windows 다운로드 폴더로 복사한다(캐시는 포함되지 않음).
    ```bash
@@ -69,7 +71,7 @@ cat data/applied/fin_v1/manifest.json
    cp fin_v1.zip /mnt/c/Users/<윈도우사용자>/Downloads/
    ```
 2. Google Drive에 `genesis` 폴더를 만들고 `fin_v1.zip`을 올린다. DART 데이터는 공개 저장소에 올리지 않는다.
-3. https://colab.research.google.com → GitHub 탭 → `Joontark-kor/GENESIS-10T` → `notebooks/applied_colab.ipynb`를 연다.
+3. https://colab.research.google.com → GitHub 탭 → `Joontark-kor/GENESIS-10T` → `notebooks/fin_colab.ipynb`를 연다.
 4. 런타임 → 런타임 유형 변경 → **L4 GPU**(유료 플랜) 또는 T4(무료, 느림) → 위에서부터 셀을 실행한다.
 5. 결과는 Drive의 `genesis/results/`에 저장된다.
 
@@ -81,21 +83,33 @@ QLoRA 8B는 24GB급 GPU 1장(L4, A10G, RTX 4090 등)이면 된다. 클라우드�
 MODEL=Qwen/Qwen3-4B
 TK='{"enable_thinking": false}'
 # (1) 학습 전 기준선
-python -m genesis.applied.evaluate_tasks run --model $MODEL --template-kwargs "$TK" \
+python -m genesis.harness.evaluate run --model $MODEL --template-kwargs "$TK" \
     --data data/applied/fin_v1/eval_test.jsonl --name base --gpu-hour-price <시간당가격> \
-    --out reports/applied/base.json
+    --train-data data/applied/fin_v1/sft_train.jsonl --out reports/applied/base.json
 # (2) QLoRA 학습
-python -m genesis.applied.finetune --base-model $MODEL --template-kwargs "$TK" --qlora \
+python -m genesis.adapt.finetune --base-model $MODEL --template-kwargs "$TK" --qlora \
     --train data/applied/fin_v1/sft_train.jsonl --val data/applied/fin_v1/sft_val.jsonl \
     --output runs/applied/fin-v1 --epochs 2 --max-length 1024
 # (3) 학습 후 평가와 비교
-python -m genesis.applied.evaluate_tasks run --model $MODEL --adapter runs/applied/fin-v1/adapter \
+python -m genesis.harness.evaluate run --model $MODEL --adapter runs/applied/fin-v1/adapter \
     --template-kwargs "$TK" --data data/applied/fin_v1/eval_test.jsonl --name fin-v1 \
-    --gpu-hour-price <시간당가격> --out reports/applied/fin-v1.json
-python -m genesis.applied.evaluate_tasks compare reports/applied/base.json reports/applied/fin-v1.json
+    --train-data data/applied/fin_v1/sft_train.jsonl --gpu-hour-price <시간당가격> --out reports/applied/fin-v1.json
+python -m genesis.harness.evaluate compare reports/applied/base.json reports/applied/fin-v1.json
 ```
 
+보고서에는 정확도·속도·비용과 함께 오염 검사(`contamination`: 평가 질문이 학습 데이터에 그대로 있는 비율, 회사 단위 분할이라 0이어야 정상)가 들어간다.
+
 공유할 것: `reports/applied/*.json`(용량이 크면 마지막 비교표만), `runs/applied/fin-v1/run.json`, `data/applied/fin_v1/manifest.json`.
+
+## 서빙: 앱은 엔드포인트만 부른다
+
+학습한 어댑터는 vLLM에 이름을 붙여 올리고, 앱은 OpenAI 호환 API로 그 이름을 부른다. 같은 평가를 서빙 경로로도 돌려 앱이 받는 품질을 확인한다.
+
+```bash
+python -m genesis.serving.endpoint vllm --base Qwen/Qwen3-4B --adapter fin=runs/applied/fin-v1/adapter   # 명령 출력
+python -m genesis.harness.evaluate run --endpoint http://localhost:8000/v1 --model fin \
+    --template-kwargs '{"enable_thinking": false}' --data data/applied/fin_v1/eval_test.jsonl --name fin-v1-served
+```
 
 ## 확인한 것과 아직 아닌 것
 
