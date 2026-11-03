@@ -6,13 +6,14 @@ import pytest
 pytest.importorskip("transformers")
 pytest.importorskip("peft")
 
-from genesis.applied.build_fin_tasks import build
-from genesis.applied.chatdata import encode_example
-from genesis.applied.evaluate_tasks import is_correct, main as eval_main, parse_number
-from genesis.applied.finetune import main as finetune_main
+from genesis_fin.build_tasks import build
+from genesis.adapt.chatdata import encode_example
+from genesis.harness.evaluate import main as eval_main
+from genesis.harness.scorers import is_correct, parse_number
+from genesis.adapt.finetune import main as finetune_main
 from genesis.chat import HF_CHAT_TEMPLATE
 from genesis.tokenizer import train_bpe
-from tests.test_applied_fin import SAMSUNG_LIKE, _record
+from tests.test_fin_tasks import SAMSUNG_LIKE, _record
 
 
 def test_parse_number_prefers_tagged_answer():
@@ -81,11 +82,16 @@ def test_finetune_then_evaluate(workspace):
     report_tuned = workspace["root"] / "tuned.json"
     common = ["--data", str(workspace["data"] / "eval_test.jsonl"), "--limit", "4", "--max-new-tokens", "8",
               "--batch-size", "2", "--cpu", "--gpu-hour-price", "2.5"]
-    base = eval_main(["run", "--model", str(workspace["model"]), "--name", "base", "--out", str(report_base), *common])
+    base = eval_main(["run", "--model", str(workspace["model"]), "--name", "base", "--out", str(report_base),
+                      "--train-data", str(workspace["data"] / "sft_train.jsonl"), *common])
     tuned = eval_main(["run", "--model", str(workspace["model"]), "--adapter", str(out / "adapter"),
                        "--name", "tuned", "--out", str(report_tuned), *common])
     for report in (base, tuned):
         assert report["items"] == 4 and 0.0 <= report["accuracy"] <= 1.0
         assert report["speed"]["generated_tokens"] > 0 and report["cost"]["gpu_hours"] == 0.0
+    assert base["report_version"] == 1 and base["genesis_version"]
+    # company-level split: no eval prompt may appear in training data
+    assert base["contamination"]["checked"] and base["contamination"]["overlap_items"] == 0
+    assert tuned["contamination"] == {"checked": False}
     compared = eval_main(["compare", str(report_base), str(report_tuned)])
     assert [r["name"] for r in compared] == ["base", "tuned"]

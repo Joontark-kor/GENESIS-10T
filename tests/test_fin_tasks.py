@@ -5,8 +5,8 @@ import zipfile
 
 import pytest
 
-from genesis.applied.build_fin_tasks import build, company_split, fetch, make_tasks
-from genesis.applied.dart import DartClient, QuotaExceeded, normalize, parse_amount
+from genesis_fin.build_tasks import build, company_split, fetch, make_tasks
+from genesis_fin.dart import DartClient, QuotaExceeded, normalize, parse_amount
 
 
 def row(sj, account_id, name, now, before):

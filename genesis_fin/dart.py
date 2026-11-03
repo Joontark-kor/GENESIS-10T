@@ -62,7 +62,7 @@ def parse_amount(value) -> int | None:
 
 
 def _default_fetch(url: str, timeout: float = 30.0) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": "genesis-applied/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "genesis-fin/0.2"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return response.read()
 
