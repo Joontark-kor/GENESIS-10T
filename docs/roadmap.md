@@ -4,11 +4,11 @@ Priority: **Track A (GENESIS-Applied)**. Track B keeps pretraining as a learning
 Each gate demands test evidence and measurement; no dates or expense guarantees.
 
 ## Track A — GENESIS-Applied (priority, career track)
-Specialise open models for Korean/Japanese corporate finance with LoRA/QLoRA; publish accuracy, cost and speed.
+Specialise open models for **Korean** corporate finance (OpenDART filings) with LoRA/QLoRA; publish accuracy, cost and speed. Japan is an optional later extension.
 
 ### A1: data and tasks [CODE DONE — needs DART key]
 - [x] OpenDART client (cached, resumable, quota-aware) and statement normalisation
-- [x] Extraction and ratio tasks with computed answers; company-level splits; ko/ja templates
+- [x] Extraction and ratio tasks with computed answers; company-level splits
 - [ ] Collect 300 listed companies × 2023–2025 and review the task manifest
 
 ### A2: baseline and first fine-tune [CODE DONE — needs GPU]
@@ -16,10 +16,13 @@ Specialise open models for Korean/Japanese corporate finance with LoRA/QLoRA; pu
 - [x] Evaluator: accuracy by task, seconds/item, tokens/s, cost per 1,000 items
 - [ ] Baseline vs fin-v1 on the held-out companies, small model then 8B
 
-### A3: Korean + Japanese, public release [NOT STARTED]
-- [ ] EDINET collector and Japanese tasks; KMMLU finance subjects, Japanese Financial Benchmark, KRX-Bench
-- [ ] Multi-year trend and peer-comparison tasks
+### A3: deeper Korean tasks and public release [NOT STARTED]
+- [ ] Harder tasks: multi-year trends, consolidated vs separate statements, peer comparison within an industry, numbers stated in filing text
+- [ ] Public benchmarks alongside: KMMLU Accounting / Taxation / Economics / Management / Real-Estate, KRX-Bench
 - [ ] Hugging Face release: adapter, model card, evaluation report, data card
+
+### Later (optional): Japan
+- [ ] EDINET collector and Japanese tasks (Japanese templates already exist), Japanese Financial Benchmark
 
 ## Track B — pretraining from scratch (learning track)
 

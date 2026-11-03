@@ -4,7 +4,7 @@
 >
 > **Near-term target: GENESIS-1B-KO** — a ~1B-parameter Korean-first model trained from scratch on data whose license is tracked per document, released with its data card, tokenizer and reproduction scripts.
 >
-> **Career track: GENESIS-Applied** — open models fine-tuned with LoRA/QLoRA for Korean/Japanese corporate-finance analysis (reading filings, computing and checking ratios), published with accuracy, cost and speed. See [docs/10_applied_ko.md](docs/10_applied_ko.md).
+> **Career track: GENESIS-Applied** — open models fine-tuned with LoRA/QLoRA for Korean corporate-finance analysis on OpenDART filings (reading filings, computing and checking ratios), published with accuracy, cost and speed. See [docs/10_applied_ko.md](docs/10_applied_ko.md).
 >
 > **Actually implemented:** the full small-scale pipeline (data registry → cleaning → Korean BPE → token shards → dense/MoE training with DDP → evaluation). No large model has been trained yet.
 
