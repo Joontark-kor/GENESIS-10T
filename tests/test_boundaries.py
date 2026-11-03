@@ -24,4 +24,5 @@ def test_core_never_imports_domain_packages():
 
 
 def test_core_has_no_old_applied_package():
-    assert not (ROOT / "genesis" / "applied").exists()
+    # git pull leaves an empty genesis/applied/__pycache__ behind on old checkouts; only source files count
+    assert not list((ROOT / "genesis" / "applied").glob("*.py"))
