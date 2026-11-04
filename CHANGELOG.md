@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Colab notebook: remove Colab's preinstalled `torchao` (an old version made peft fail with `ImportError` when loading an adapter), write the run directory straight to Drive (a disconnected session keeps its checkpoints), and copy only `reports/` in the save cell.
+
 ## v0.2.0 — 2026-11 — the GENESIS core as a contract
 
 Breaking: `genesis.applied` is gone. New locations:
