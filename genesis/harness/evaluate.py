@@ -151,6 +151,10 @@ def run(args) -> dict:
     if args.limit:
         items = items[:args.limit]
     generator = EndpointGenerator(args) if args.endpoint else LocalGenerator(args)
+    if args.pipeline == "gorilla":
+        from genesis.harness.gorilla import CalcPipeline
+
+        generator = CalcPipeline(generator, digits=args.pipeline_digits)
     default_scorer = args.scorer
     rows, generated_tokens = [], 0
     generator.sync()
@@ -188,7 +192,9 @@ def run(args) -> dict:
         "hardware": generator.hardware,
         "settings": {"max_new_tokens": args.max_new_tokens, "decoding": "greedy", "scorer": default_scorer,
                      "template_kwargs": json.loads(args.template_kwargs), "load_4bit": args.load_4bit,
-                     "precision": getattr(generator, "precision", None)},
+                     "precision": getattr(generator, "precision", None),
+                     "pipeline": args.pipeline, "pipeline_digits": args.pipeline_digits if args.pipeline != "none" else None,
+                     "pipeline_fallbacks": getattr(generator, "fallbacks", None)},
         "rows": rows,
     }
     if args.out:
@@ -235,6 +241,9 @@ def main(argv: list[str] | None = None):
     r.add_argument("--load-4bit", action="store_true")
     r.add_argument("--template-kwargs", default="{}")
     r.add_argument("--cpu", action="store_true")
+    r.add_argument("--pipeline", choices=["none", "gorilla"], default="none",
+                   help="gorilla: the model writes a formula, a calculator computes the answer")
+    r.add_argument("--pipeline-digits", type=int, default=2, help="decimals of the calculated answer")
     c = sub.add_parser("compare")
     c.add_argument("reports", type=Path, nargs="+")
     args = p.parse_args(argv)
