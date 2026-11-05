@@ -59,3 +59,17 @@ python -m genesis.harness.evaluate compare reports/applied/base.json reports/app
 보고서 `settings.pipeline_ungrounded`에 횟수만 기록하고 답은 바꾸지 않는다.
 잡을 수 있는 것: 지어낸 숫자·잘못 옮긴 숫자(2차의 ROE 오답 `10682.6`). 못 잡는 것: 표에서 엉뚱한 연도·항목의 값을 집은 경우(추출 5건) —
 이 유형은 원문 속 값이라 통과한다. 측정으로 효과가 작다고 나오면 2단계(항목명·연도 대조)를 설계한다.
+
+## 두 번째 분야 확인 (일상 수치 문제)
+
+금융 밖에서도 같은 구조가 통하는지 보는 평가셋 `genesis_calc`(증감률·할인·부가세·평균·단리 이자·속도·단위 환산, 질문마다 쓰면 안 되는 숫자 섞음, 코드로 생성·외부 데이터 없음).
+
+```bash
+python -m genesis_calc.build_tasks --out data/applied/calc_v1 --per-kind 60 --seed 1
+python -m genesis.harness.evaluate run --model Qwen/Qwen3-4B --template-kwargs '{"enable_thinking": false}' \
+    --data data/applied/calc_v1/eval_test.jsonl --name calc-base --batch-size 16 --max-new-tokens 128 --out reports/applied/calc-base.json
+python -m genesis.harness.evaluate run ... --name calc-gorilla --pipeline gorilla --out reports/applied/calc-gorilla.json
+python -m genesis.harness.evaluate compare reports/applied/calc-base.json reports/applied/calc-gorilla.json
+```
+
+기대: 기본 모델이 산술에서 틀리는 만큼 고릴라가 올린다. 기대와 다르면(이미 높거나 안 오르면) 그것이 코어에 대해 새로 배우는 것이다.
