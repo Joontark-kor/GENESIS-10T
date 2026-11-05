@@ -12,7 +12,7 @@ from __future__ import annotations
 import copy
 import re
 
-from genesis.tools import CalculationError, calculate, format_number
+from genesis.tools import CalculationError, calculate, clean, format_number
 
 INSTRUCTION = ("\n\n수치를 계산해야 하면 직접 계산하지 말고, 마지막 줄에 '계산식: <수식>' 한 줄만 쓰세요. "
                "수식에는 질문의 숫자와 + - * / ( ) 만 사용하고, 단위(%, 원)와 '정답'은 쓰지 마세요. "
@@ -42,6 +42,28 @@ def finish(reply: str, digits: int = 2) -> tuple[str, bool]:
     return f"{reply.rstrip()}\n정답: {format_number(value, digits)}", True
 
 
+_FREE = {1.0, 100.0}
+_NUMBER = re.compile(r"\d+(?:\.\d+)?")
+
+
+def _numbers(text: str) -> set[float]:
+    return {float(n) for n in _NUMBER.findall(text.replace(",", ""))}
+
+
+def ungrounded(question: str, expression: str) -> list[float]:
+    """Numbers in the formula that do not appear in the question (a made-up or mis-copied figure).
+
+    The check is deliberately dumb: it cannot tell a wrong-but-present number from the right one,
+    so it catches invented figures, not picked-the-wrong-row mistakes.
+    """
+    present = _numbers(question) | _FREE  # 1 and 100 are structure (growth = x/y - 1, percent = * 100)
+    return sorted(n for n in _numbers(clean(expression)) if n not in present)
+
+
+def question_text(item: dict) -> str:
+    return "\n".join(m["content"] for m in item["messages"] if m["role"] == "user")
+
+
 class CalcPipeline:
     """Wraps any generator (local model or endpoint) of ``genesis.harness.evaluate``."""
 
@@ -49,7 +71,7 @@ class CalcPipeline:
 
     def __init__(self, base, digits: int = 2):
         self.base, self.digits = base, digits
-        self.calls = self.fallbacks = 0
+        self.calls = self.fallbacks = self.ungrounded = 0
 
     def __getattr__(self, attribute):  # hardware, precision, use_cuda, sync ...
         return getattr(self.base, attribute)
@@ -57,8 +79,12 @@ class CalcPipeline:
     def generate(self, batch: list[dict]) -> list[tuple[str, int]]:
         outputs = self.base.generate([with_instruction(item) for item in batch])
         results = []
-        for text, n_tokens in outputs:
+        for item, (text, n_tokens) in zip(batch, outputs):
             final, used = finish(text, self.digits)
+            if used:
+                bad = ungrounded(question_text(item), _EXPRESSION.findall(text)[-1])
+                if bad:
+                    self.ungrounded += 1  # counted only: the answer text stays as the model produced it
             self.calls += 1
             self.fallbacks += 0 if used else 1
             results.append((final, n_tokens))
