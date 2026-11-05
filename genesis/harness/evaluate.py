@@ -194,7 +194,8 @@ def run(args) -> dict:
                      "template_kwargs": json.loads(args.template_kwargs), "load_4bit": args.load_4bit,
                      "precision": getattr(generator, "precision", None),
                      "pipeline": args.pipeline, "pipeline_digits": args.pipeline_digits if args.pipeline != "none" else None,
-                     "pipeline_fallbacks": getattr(generator, "fallbacks", None)},
+                     "pipeline_fallbacks": getattr(generator, "fallbacks", None),
+                     "pipeline_ungrounded": getattr(generator, "ungrounded", None)},
         "rows": rows,
     }
     if args.out:
