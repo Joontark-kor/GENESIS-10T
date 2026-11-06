@@ -43,7 +43,7 @@ def test_pipeline_wraps_a_generator_and_counts_fallbacks():
             return [("계산식: 10 / 4", 7), ("모르겠습니다", 3)]
 
     item = {"messages": [{"role": "system", "content": "s"}, {"role": "user", "content": "q"}], "gold": 2.5}
-    pipeline = CalcPipeline(Fake())
+    pipeline = CalcPipeline(Fake(), retry=False)
     out = pipeline.generate([item, item])
     assert out[0] == ("계산식: 10 / 4\n정답: 2.5", 7) and out[1] == ("모르겠습니다", 3)
     assert pipeline.hardware == "fake" and pipeline.fallbacks == 1 and pipeline.calls == 2
@@ -76,3 +76,67 @@ def test_percent_sign_inside_a_formula_means_divide_by_100():
     assert calculate("4800000 * 3% * 4") == pytest.approx(576000)
     assert calculate("(1361965 / 2197825) * 100%") == pytest.approx(61.97, abs=1e-2)  # trailing 100% stays x100
     assert calculate("200 * (1 + 5%)") == pytest.approx(210)
+
+
+def test_formula_typed_on_the_answer_line_is_still_calculated():
+    final, used = finish("정답: 134000 × (1 - 0.3)")  # seen in the 2026-11-06 Colab run
+    assert used and final.endswith("정답: 93800")
+    final, used = finish("정답: 2023-2024")  # a range is not a formula
+    assert not used and final == "정답: 2023-2024"
+    final, used = finish("정답: 163,200")
+    assert not used
+
+
+def test_looked_up_tells_a_table_value_from_a_number_worked_out_in_the_head():
+    from genesis.harness.gorilla import looked_up
+    question = "매출액 106,826백만원, 영업이익 10,682백만원이다."
+    assert looked_up(question, "정답: 106,826")
+    assert not looked_up(question, "정답: 10")  # not in the question: computed
+    assert not looked_up(question, "모르겠습니다")  # no answer line
+
+
+class _Scripted:
+    """Answers the first call with `first`, every later call with `second`."""
+
+    def __init__(self, first, second):
+        self.first, self.second, self.calls = first, second, []
+
+    def generate(self, batch):
+        self.calls.append([item["messages"][-1]["content"] for item in batch])
+        replies = self.first if len(self.calls) == 1 else self.second
+        return replies[:len(batch)]
+
+
+def test_retry_rescues_an_answer_worked_out_without_a_formula():
+    item = {"messages": [{"role": "user", "content": "134,000원의 30% 할인가는?"}]}
+    base = _Scripted([("정답: 93900", 5)], [("계산식: 134000 * (1 - 30%)", 9)])
+    pipeline = CalcPipeline(base)
+    out = pipeline.generate([item])
+    assert out[0][0].endswith("정답: 93800") and out[0][1] == 14  # tokens of both calls
+    assert pipeline.retried == 1 and pipeline.rescued == 1 and pipeline.fallbacks == 0
+    assert "직접 계산하지 말고" in base.calls[1][0]
+
+
+def test_retry_skips_table_lookups_and_keeps_the_reply_when_it_fails():
+    lookup = {"messages": [{"role": "user", "content": "매출액은 106,826백만원이다. 매출액은?"}]}
+    worked = {"messages": [{"role": "user", "content": "A는 8, B는 4이다. A÷B는?"}]}
+    base = _Scripted([("정답: 106,826", 4), ("정답: 2", 4)], [("모르겠습니다", 2)])
+    pipeline = CalcPipeline(base)
+    out = pipeline.generate([lookup, worked])
+    assert out[0][0] == "정답: 106,826"  # lookup: no retry
+    assert out[1] == ("정답: 2", 6)  # retried, no formula came back: original reply kept, tokens still counted
+    assert len(base.calls) == 2 and len(base.calls[1]) == 1
+    assert pipeline.retried == 1 and pipeline.rescued == 0
+    assert pipeline.fallbacks == 2  # "no calculator used": the lookup and the failed retry
+
+
+def test_retry_can_be_switched_off():
+    item = {"messages": [{"role": "user", "content": "A는 8, B는 4이다. A÷B는?"}]}
+    base = _Scripted([("정답: 2", 4)], [("계산식: 8 / 4", 4)])
+    pipeline = CalcPipeline(base, retry=False)
+    assert pipeline.generate([item])[0] == ("정답: 2", 4) and len(base.calls) == 1
+
+
+def test_known_limit_an_answer_equal_to_a_number_in_the_question_is_not_retried():
+    from genesis.harness.gorilla import looked_up
+    assert looked_up("A는 6, B는 3이다. A÷B는?", "정답: 3")  # 6/3 = 2 would be caught; this guess is not
