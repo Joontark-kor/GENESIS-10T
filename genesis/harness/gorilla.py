@@ -85,13 +85,13 @@ def looked_up(question: str, reply: str) -> bool:
     """True when the ``정답:`` value is made only of numbers that appear in the question (read off a table).
 
     A number that is not in the question was worked out in the model's head, which is exactly what the
-    calculator is there to prevent.
+    calculator is there to prevent. An answer without any number is not a calculation either.
     """
     answers = _ANSWER.findall(reply)
     if not answers:
         return False
     values = _numbers(answers[-1])
-    return bool(values) and values <= _numbers(question)
+    return values <= _numbers(question)  # an answer with no digits (a name, a label) needs no calculator
 
 
 class CalcPipeline:

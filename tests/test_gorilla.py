@@ -93,6 +93,7 @@ def test_looked_up_tells_a_table_value_from_a_number_worked_out_in_the_head():
     assert looked_up(question, "정답: 106,826")
     assert not looked_up(question, "정답: 10")  # not in the question: computed
     assert not looked_up(question, "모르겠습니다")  # no answer line
+    assert looked_up(question, "정답: 삼성전자")  # a name is not a calculation: never retried
 
 
 class _Scripted:
