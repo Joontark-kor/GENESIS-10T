@@ -54,7 +54,7 @@ python -m pytest -q              # 93 tests must pass; no GPU needed
 
 - main: structure v0.2.0 merged (PRs #6-#10); `v0.2.0` tag pending (owner).
 - fin-v1 baseline (Qwen3-4B, 544 test items): **85.3%** (debt_ratio 61.8, equity_ratio 66.2, net_margin 80.9, operating_margin 91.2, revenue_growth 86.8, roe 95.6, extract 100). The stop criterion "85% and +15 points over baseline" is unreachable with this baseline; it must be redefined (harder eval or a different metric) before more fin rounds.
-- First QLoRA was running on a Colab T4 (470 steps, ~2h10m); results go to Google Drive `MyDrive/genesis/results/`.
+- First QLoRA was running on a Colab T4 (470 steps, ~2h10m); results now go to private Hugging Face repos (`<user>/genesis-fin-v1-data`, `<user>/genesis-fin-v1-runs`) via `genesis.hubsync`, not Google Drive; the Colab Secret `HF_TOKEN` must exist (never print or commit tokens).
 - Direction from the owner: **do not dig only into finance.** Prefer core work (remaining Gate C items, Gate 1/2 items doable without a GPU) and a second domain over more fin tuning.
 
 ## Not doable from a coding agent
