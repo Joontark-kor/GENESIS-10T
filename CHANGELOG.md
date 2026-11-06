@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Colab without Google Drive: `genesis.hubsync` (private Hugging Face repos; background uploader, restore + `--resume`), `fin_colab.ipynb` reads `fin_v1.zip` from a private dataset repo with the Colab Secret `HF_TOKEN` and pushes checkpoints/reports to a private model repo.
+
 - `notebooks/gorilla_check_colab.ipynb`: a Colab notebook that measures baseline vs gorilla on the everyday-numbers set without Google Drive (no permission popup); the finance set is an optional upload. Calculator now reads `N%` inside a formula as N/100.
 
 - Colab notebook: remove Colab's preinstalled `torchao` (an old version made peft fail with `ImportError` when loading an adapter), write the run directory straight to Drive (a disconnected session keeps its checkpoints), and copy only `reports/` in the save cell.
