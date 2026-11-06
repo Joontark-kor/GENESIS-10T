@@ -70,10 +70,10 @@ cat data/applied/fin_v1/manifest.json
    cd ~/work/GENESIS-10T && python -c "import shutil; shutil.make_archive('fin_v1','zip','data/applied','fin_v1')"
    cp fin_v1.zip /mnt/c/Users/<윈도우사용자>/Downloads/
    ```
-2. Google Drive에 `genesis` 폴더를 만들고 `fin_v1.zip`을 올린다. DART 데이터는 공개 저장소에 올리지 않는다.
+2. Hugging Face에 **비공개** 데이터셋 `genesis-fin-v1-data`를 만들고 `fin_v1.zip`을 올린다(웹에서 끌어다 놓기). DART 데이터는 공개 저장소에 올리지 않는다.
 3. https://colab.research.google.com → GitHub 탭 → `Joontark-kor/GENESIS-10T` → `notebooks/fin_colab.ipynb`를 연다.
 4. 런타임 → 런타임 유형 변경 → **L4 GPU**(유료 플랜) 또는 T4(무료, 느림) → 위에서부터 셀을 실행한다.
-5. 결과는 Drive의 `genesis/results/`에 저장된다.
+5. 노트북은 Colab **Secrets**의 `HF_TOKEN`(쓰기 권한, 노트북 접근 켬)으로 데이터를 받고, 체크포인트·보고서를 비공개 모델 저장소 `genesis-fin-v1-runs`에 10분마다 올린다. 세션이 끊겨도 다시 실행하면 이어서(`--resume`) 돈다. Google Drive 권한 팝업은 없다.
 
 **직접 서버를 빌리는 방법:**
 
