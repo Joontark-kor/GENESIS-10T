@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `notebooks/gorilla_check_colab.ipynb`: a Colab notebook that measures baseline vs gorilla on the everyday-numbers set without Google Drive (no permission popup); the finance set is an optional upload. Calculator now reads `N%` inside a formula as N/100.
+
 - Colab notebook: remove Colab's preinstalled `torchao` (an old version made peft fail with `ImportError` when loading an adapter), write the run directory straight to Drive (a disconnected session keeps its checkpoints), and copy only `reports/` in the save cell.
 
 ## v0.2.0 — 2026-11 — the GENESIS core as a contract
