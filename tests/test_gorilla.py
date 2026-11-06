@@ -70,3 +70,9 @@ def test_pipeline_counts_ungrounded_without_changing_the_answer():
     pipeline = CalcPipeline(Fake())
     out = pipeline.generate([item])
     assert out[0][0].endswith("정답: 2.5") and pipeline.ungrounded == 1
+
+
+def test_percent_sign_inside_a_formula_means_divide_by_100():
+    assert calculate("4800000 * 3% * 4") == pytest.approx(576000)
+    assert calculate("(1361965 / 2197825) * 100%") == pytest.approx(61.97, abs=1e-2)  # trailing 100% stays x100
+    assert calculate("200 * (1 + 5%)") == pytest.approx(210)

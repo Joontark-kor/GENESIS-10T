@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ast
 import operator
+import re
 
 _BINARY = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv,
            ast.Pow: operator.pow}
@@ -41,10 +42,20 @@ def _eval(node: ast.AST) -> float:
 _TRANSLATE = str.maketrans({"×": "*", "÷": "/", "−": "-", "△": "-", "（": "(", "）": ")", "，": ","})
 
 
+_PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s*%")
+
+
+def _percent(match: re.Match) -> str:
+    """'3%' means 3/100 inside a formula; a trailing '100%' is just the 'x 100' of a ratio and stays 100."""
+    number = match.group(1)
+    return number if float(number) == 100 else f"({number}/100)"
+
+
 def clean(expression: str) -> str:
     """Normalize what models tend to write: thousands separators, × ÷ −, a trailing '= result'."""
-    text = expression.translate(_TRANSLATE).split("=")[0]
-    return text.replace(",", "").replace("%", "").strip()
+    text = expression.translate(_TRANSLATE).split("=")[0].replace(",", "")
+    text = _PERCENT.sub(_percent, text)
+    return text.replace("%", "").strip()
 
 
 def calculate(expression: str) -> float:
