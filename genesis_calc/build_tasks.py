@@ -39,7 +39,7 @@ def make(kind: str, rng: random.Random) -> tuple[str, float, float]:
         return q, _round(price * (100 - pct) / 100), 0.5
     if kind == "tax_inclusive":
         net, rate = rng.randint(10, 900) * 1000, rng.choice([5, 8, 10])
-        q = f"공급가액이 {net:,}원이고 부가세율이 {rate}%일 때, 부가세를 포함한 합계는 몇 원인가? (수량은 {rng.randint(2, 9)}개)"
+        q = f"공급가액이 {net:,}원이고 부가세율이 {rate}%일 때, 부가세를 포함한 합계는 몇 원인가? (사업자 번호 끝자리: {rng.randint(1000, 9999)})"
         return q, _round(net * (100 + rate) / 100), 0.5
     if kind == "average":
         xs = [rng.randint(40, 100) for _ in range(rng.randint(4, 6))]
@@ -51,7 +51,7 @@ def make(kind: str, rng: random.Random) -> tuple[str, float, float]:
         return q, _round(p * r / 100 * y), 0.5
     if kind == "speed_time":
         v, t = rng.choice([40, 60, 72, 80, 90, 100]), rng.choice([1.5, 2, 2.5, 3, 4])
-        q = f"시속 {v}km로 {t}시간 달렸다. 도중에 {rng.randint(10, 30)}분 쉬었지만 이 시간은 주행에 포함하지 않는다. 이동 거리는 몇 km인가?"
+        q = f"시속 {v}km로 {t}시간 달렸다. 출발 시각은 오전 {rng.randint(6, 11)}시였다. 이동 거리는 몇 km인가?"
         return q, _round(v * t), 0.01
     if kind == "unit_convert":
         km, price = rng.randint(2, 90), rng.randint(2, 9) * 100
