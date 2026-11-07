@@ -272,7 +272,7 @@ def main(argv: list[str] | None = None):
     r.add_argument("--unit-hint", action="store_true",
                    help="gorilla: tell the model to give the result in the unit asked for (a percent as 25, not 0.25)")
     r.add_argument("--exclude-check", action="store_true",
-                   help="gorilla: the model lists the numbers it will not use first; a formula that uses one is retried once")
+                   help="gorilla: the model lists the numbers it will not use first; a formula that uses one is retried once. Only for questions with distractor numbers: on the finance set it dropped accuracy from ~98.8% to 75.9%")
     c = sub.add_parser("compare")
     c.add_argument("reports", type=Path, nargs="+")
     args = p.parse_args(argv)
