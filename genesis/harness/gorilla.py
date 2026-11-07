@@ -77,11 +77,30 @@ def _numbers(text: str) -> set[float]:
 def ungrounded(question: str, expression: str) -> list[float]:
     """Numbers in the formula that do not appear in the question (a made-up or mis-copied figure).
 
-    The check is deliberately dumb: it cannot tell a wrong-but-present number from the right one,
-    so it catches invented figures, not picked-the-wrong-row mistakes.
+    A number counts as present when it is in the question as written, or as its percent form
+    (``5`` in the question, ``0.05`` in the formula, or the reverse). It still cannot tell a
+    wrong-but-present number from the right one: that is what ``direction_flag`` is for.
     """
-    present = _numbers(question) | _FREE  # 1 and 100 are structure (growth = x/y - 1, percent = * 100)
-    return sorted(n for n in _numbers(clean(expression)) if n not in present)
+    asked = _numbers(question)
+    present = asked | _FREE  # 1 and 100 are structure (growth = x/y - 1, percent = * 100)
+    present |= {round(n / 100, 10) for n in asked} | {round(n * 100, 10) for n in asked}
+    return sorted(n for n in _numbers(clean(expression)) if round(n, 10) not in present)
+
+
+_RATE = re.compile(r"증감률|증가율|감소율|성장률|변화율|변동률|증가폭|감소폭")
+_DELTA_OVER = re.compile(r"\(\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*\)\s*/\s*(\d+(?:\.\d+)?)")
+
+
+def direction_flag(question: str, expression: str) -> bool:
+    """True when a rate-of-change question gets ``(a - b) / a``: the base must be the value subtracted.
+
+    ``(new - old) / old`` is right; dividing by the minuend (the new value) gives a different number and,
+    when the value fell, a wrong sign. Only this one shape is checked, so a False says nothing.
+    """
+    if not _RATE.search(question):
+        return False
+    flat = clean(expression).replace(",", "")
+    return any(float(a) == float(c) and float(a) != float(b) for a, b, c in _DELTA_OVER.findall(flat))
 
 
 def question_text(item: dict) -> str:
@@ -109,15 +128,20 @@ class CalcPipeline:
     def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
                  prefill: bool = False):
         self.base, self.digits, self.retry, self.hint, self.prefill = base, digits, retry, hint, prefill
-        self.calls = self.fallbacks = self.ungrounded = self.retried = self.rescued = 0
+        self.calls = self.fallbacks = self.ungrounded = self.direction = self.retried = self.rescued = 0
 
     def __getattr__(self, attribute):  # hardware, precision, use_cuda, sync ...
         return getattr(self.base, attribute)
 
     def _check_grounding(self, item: dict, reply: str) -> None:
         expression = expression_of(reply)
-        if expression is not None and ungrounded(question_text(item), expression):
+        if expression is None:
+            return
+        question = question_text(item)
+        if ungrounded(question, expression):
             self.ungrounded += 1  # counted only: the answer text stays as the model produced it
+        if direction_flag(question, expression):
+            self.direction += 1
 
     def _retry_item(self, item: dict) -> dict:
         clone = with_instruction(item, RETRY_INSTRUCTION + (DISTRACTOR_HINT if self.hint else ""))
