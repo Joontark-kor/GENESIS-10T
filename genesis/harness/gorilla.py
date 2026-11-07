@@ -29,6 +29,9 @@ RETRY_INSTRUCTION = ("\n\n직접 계산하지 말고 마지막 줄에 '계산식
 DISTRACTOR_HINT = ("\n수식에는 질문이 묻는 값에 실제로 쓰이는 숫자만 넣으세요. "
                    "'제외', '빼고', '별도'라고 한 항목이나 값과 관계없는 숫자(번호, 연도, 배송비 등)는 넣지 마세요.")
 RETRY_PREFILL = "계산식: "
+# Optional (--direction-retry): sent only when direction_flag fired on a rate-of-change formula.
+DIRECTION_HINT = ("\n증감률·성장률은 (나중 값 - 처음 값) / 처음 값입니다. 나누는 수는 비교의 출발점인 처음(기준) 값이고, "
+                  "값이 줄었으면 결과는 음수입니다.")
 _EXPRESSION = re.compile(r"(?:계산식|Expression|式)\s*[:：]\s*(.+)", re.IGNORECASE)
 _ANSWER = re.compile(r"정답\s*[:：]\s*(.+)")
 # arithmetic between numbers on an answer line: "134000 × (1 - 0.3)"; a bare "2023-2024" is not a formula
@@ -87,15 +90,16 @@ def ungrounded(question: str, expression: str) -> list[float]:
     return sorted(n for n in _numbers(clean(expression)) if round(n, 10) not in present)
 
 
-_RATE = re.compile(r"증감률|증가율|감소율|성장률|변화율|변동률|증가폭|감소폭")
+_RATE = re.compile(r"증감률|증가율|성장률|변화율|변동률|증가폭")  # not 감소율: (old - new) / old is right there
 _DELTA_OVER = re.compile(r"\(\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*\)\s*/\s*(\d+(?:\.\d+)?)")
 
 
 def direction_flag(question: str, expression: str) -> bool:
-    """True when a rate-of-change question gets ``(a - b) / a``: the base must be the value subtracted.
+    """True when a signed rate-of-change question gets ``(a - b) / a``: the minuend is also the base.
 
-    ``(new - old) / old`` is right; dividing by the minuend (the new value) gives a different number and,
-    when the value fell, a wrong sign. Only this one shape is checked, so a False says nothing.
+    ``(new - old) / old`` is right, so ``(old - new) / old`` has the sign reversed (a fall comes out
+    positive) and ``(new - old) / new`` has the wrong base. Only this one shape is checked, so a False
+    says nothing. Questions that ask for a fall (감소율) are skipped: there ``(old - new) / old`` is right.
     """
     if not _RATE.search(question):
         return False
@@ -126,25 +130,30 @@ class CalcPipeline:
     name = "gorilla"
 
     def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
-                 prefill: bool = False):
+                 prefill: bool = False, direction_retry: bool = False):
         self.base, self.digits, self.retry, self.hint, self.prefill = base, digits, retry, hint, prefill
+        self.direction_retry = direction_retry
+        self.direction_rescued = 0
         self.calls = self.fallbacks = self.ungrounded = self.direction = self.retried = self.rescued = 0
 
     def __getattr__(self, attribute):  # hardware, precision, use_cuda, sync ...
         return getattr(self.base, attribute)
 
-    def _check_grounding(self, item: dict, reply: str) -> None:
+    def _check_grounding(self, item: dict, reply: str) -> bool:
+        """Counts suspicious formulas (the answer text stays as the model wrote it); True if the direction is suspect."""
         expression = expression_of(reply)
         if expression is None:
-            return
+            return False
         question = question_text(item)
         if ungrounded(question, expression):
-            self.ungrounded += 1  # counted only: the answer text stays as the model produced it
-        if direction_flag(question, expression):
-            self.direction += 1
+            self.ungrounded += 1
+        flagged = direction_flag(question, expression)
+        self.direction += flagged
+        return flagged
 
-    def _retry_item(self, item: dict) -> dict:
-        clone = with_instruction(item, RETRY_INSTRUCTION + (DISTRACTOR_HINT if self.hint else ""))
+    def _retry_item(self, item: dict, direction: bool = False) -> dict:
+        clone = with_instruction(item, RETRY_INSTRUCTION + (DISTRACTOR_HINT if self.hint else "")
+                                 + (DIRECTION_HINT if direction else ""))
         if self.prefill:
             clone["prefill"] = RETRY_PREFILL  # local generators force the reply to start with it
         return clone
@@ -153,23 +162,32 @@ class CalcPipeline:
         outputs = self.base.generate([with_instruction(item, INSTRUCTION + (DISTRACTOR_HINT if self.hint else "")) for item in batch])
         results: list[list] = []  # [final text, tokens, used the calculator]
         again: list[int] = []
+        flagged: set[int] = set()  # answers with a formula whose direction looks wrong (--direction-retry)
         for index, (item, (text, n_tokens)) in enumerate(zip(batch, outputs)):
             final, used = finish(text, self.digits)
             self.calls += 1
             if used:
-                self._check_grounding(item, text)
+                if self._check_grounding(item, text) and self.direction_retry:
+                    again.append(index)
+                    flagged.add(index)
             elif self.retry and not looked_up(question_text(item), text):
                 again.append(index)
             results.append([final, n_tokens, used])
         if again:
-            second = self.base.generate([self._retry_item(batch[i]) for i in again])
+            second = self.base.generate([self._retry_item(batch[i], i in flagged) for i in again])
             for index, (text, n_tokens) in zip(again, second):
                 self.retried += 1
                 results[index][1] += n_tokens  # the retry costs tokens too
                 final, used = finish(text, self.digits)
-                if used:
-                    self.rescued += 1
-                    self._check_grounding(batch[index], text)
-                    results[index][0], results[index][2] = final, True
+                if not used:
+                    continue
+                if index in flagged:  # keep the first answer unless the retry fixed the direction
+                    if not self._check_grounding(batch[index], text):
+                        self.direction_rescued += 1
+                        results[index][0] = final
+                    continue
+                self.rescued += 1
+                self._check_grounding(batch[index], text)
+                results[index][0], results[index][2] = final, True
         self.fallbacks += sum(1 for _, _, used in results if not used)
         return [(final, n_tokens) for final, n_tokens, _ in results]

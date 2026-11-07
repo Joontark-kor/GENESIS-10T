@@ -200,3 +200,32 @@ def test_pipeline_counts_direction_flags_without_changing_the_answer():
     pipeline = CalcPipeline(Fake())
     out = pipeline.generate([item])
     assert pipeline.direction == 1 and out[0][0].endswith("정답: 54.14")
+
+
+def test_direction_retry_is_opt_in_and_only_replaces_with_a_fixed_formula():
+    from genesis.harness.gorilla import CalcPipeline
+
+    class Fake:
+        def __init__(self):
+            self.prompts = []
+
+        def generate(self, batch):
+            self.prompts.append([b["messages"][-1]["content"] for b in batch])
+            if len(self.prompts) == 1:
+                return [("계산식: (7240 - 3320) / 7240 * 100", 3)]
+            return [("계산식: (7240 - 3320) / 3320 * 100", 3)]
+
+    item = {"messages": [{"role": "user", "content": "3320에서 7240으로. 증감률은?"}]}
+    off = CalcPipeline(Fake())
+    assert off.generate([item])[0][0].endswith("정답: 54.14") and off.retried == 0
+    fake = Fake()
+    on = CalcPipeline(fake, direction_retry=True)
+    out = on.generate([item])
+    assert out[0][0].endswith("정답: 118.07") and on.direction_rescued == 1
+    assert "처음 값" in fake.prompts[1][0]  # the hint reached the retry only
+    assert "처음 값" not in fake.prompts[0][0]
+
+
+def test_direction_flag_skips_decrease_rate_questions():
+    from genesis.harness.gorilla import direction_flag
+    assert direction_flag("7240에서 3320으로. 감소율은?", "(7240 - 3320) / 7240 * 100") is False
