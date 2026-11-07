@@ -71,7 +71,7 @@ def make_hard(kind: str, rng: random.Random) -> tuple[str, float, float]:
     """(question, gold, tolerance) for the harder set: powers, roots and multi-step formulas."""
     if kind == "compound_interest":
         p, r, y = rng.randint(5, 90) * 100, rng.choice([2.5, 3, 3.5, 4, 4.5, 5]), rng.randint(2, 6)
-        q = (f"{p:,}만원을 연 {r}% 복리(1년에 한 번)로 {y}년 맡겼다. 통장 개설 수수료는 {rng.randint(1, 5)}만원이다. "
+        q = (f"{p:,}만원을 연 {r}% 복리(1년에 한 번)로 {y}년 맡겼다. 통장 개설 수수료 {rng.randint(1, 5)}만원은 별도이며 원리금에 포함하지 않는다. "
              f"만기 원리금 합계는 몇 만원인가? (소수 둘째 자리)")
         return q, _round(p * (1 + r / 100) ** y), 0.01
     if kind == "cagr":

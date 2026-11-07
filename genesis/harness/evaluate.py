@@ -158,7 +158,7 @@ def run(args) -> dict:
 
         generator = CalcPipeline(generator, digits=args.pipeline_digits, retry=not args.no_pipeline_retry,
                                 hint=args.distractor_hint, prefill=args.retry_prefill,
-                                direction_retry=args.direction_retry)
+                                direction_retry=args.direction_retry, unit_hint=args.unit_hint)
     default_scorer = args.scorer
     rows, generated_tokens = [], 0
     generator.sync()
@@ -201,6 +201,7 @@ def run(args) -> dict:
                      "pipeline_fallbacks": getattr(generator, "fallbacks", None),
                      "pipeline_ungrounded": getattr(generator, "ungrounded", None),
                      "pipeline_direction": getattr(generator, "direction", None),
+                     "pipeline_unit_hint": getattr(generator, "unit_hint", None),
                      "pipeline_direction_retry": getattr(generator, "direction_retry", None),
                      "pipeline_direction_rescued": getattr(generator, "direction_rescued", None),
                      "pipeline_retried": getattr(generator, "retried", None),
@@ -264,6 +265,8 @@ def main(argv: list[str] | None = None):
                    help="gorilla: the retry reply starts with '계산식:' so the model cannot answer directly (local models only)")
     r.add_argument("--direction-retry", action="store_true",
                    help="gorilla: retry once, with a hint, when a rate-of-change formula divides by the new value")
+    r.add_argument("--unit-hint", action="store_true",
+                   help="gorilla: tell the model to give the result in the unit asked for (a percent as 25, not 0.25)")
     c = sub.add_parser("compare")
     c.add_argument("reports", type=Path, nargs="+")
     args = p.parse_args(argv)
