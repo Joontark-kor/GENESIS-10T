@@ -247,3 +247,35 @@ def test_unit_hint_is_opt_in_and_reaches_first_pass_and_retry():
     assert all(UNIT_HINT not in p for p in off.prompts)
     on = Fake(); CalcPipeline(on, unit_hint=True).generate([item])
     assert len(on.prompts) == 2 and all(UNIT_HINT in p for p in on.prompts)
+
+
+def test_contradiction_finds_numbers_listed_as_excluded_but_used():
+    from genesis.harness.gorilla import contradiction
+    reply = "제외: 4\n계산식: 2000*(1+0.04)^5 - 4"
+    assert contradiction(reply, "2000*(1+0.04)^5 - 4") == [4.0]
+    assert contradiction("제외: 4\n계산식: 2000*(1+0.04)^5", "2000*(1+0.04)^5") == []
+    assert contradiction("제외: 없음\n계산식: 3 + 4", "3 + 4") == []
+    assert contradiction("계산식: 3 + 4", "3 + 4") == []
+
+
+def test_exclude_check_retries_a_self_contradicting_formula_and_keeps_the_fixed_one():
+    from genesis.harness.gorilla import CalcPipeline
+
+    class Fake:
+        def __init__(self):
+            self.prompts = []
+
+        def generate(self, batch):
+            self.prompts.append([b["messages"][-1]["content"] for b in batch])
+            if len(self.prompts) == 1:
+                return [("제외: 4\n계산식: 100 - 4", 5)]
+            return [("계산식: 100", 3)]
+
+    item = {"messages": [{"role": "user", "content": "금액 100, 수수료 4는 별도. 금액은?"}]}
+    off = CalcPipeline(Fake())
+    assert off.generate([item])[0][0].endswith("정답: 96") and off.retried == 0
+    fake = Fake()
+    on = CalcPipeline(fake, exclude_check=True)
+    out = on.generate([item])
+    assert out[0][0].endswith("정답: 100") and on.contradiction_rescued == 1 and on.contradicted == 1
+    assert "제외한 숫자" in fake.prompts[1][0] and "제외:" in fake.prompts[0][0]
