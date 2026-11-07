@@ -141,3 +141,14 @@ def test_retry_can_be_switched_off():
 def test_known_limit_an_answer_equal_to_a_number_in_the_question_is_not_retried():
     from genesis.harness.gorilla import looked_up
     assert looked_up("A는 6, B는 3이다. A÷B는?", "정답: 3")  # 6/3 = 2 would be caught; this guess is not
+
+
+def test_distractor_hint_is_opt_in_and_reaches_first_pass_and_retry():
+    from genesis.harness.gorilla import DISTRACTOR_HINT
+    item = {"messages": [{"role": "user", "content": "A는 8, B는 4이다. A÷B는?"}]}
+    plain = _Scripted([("정답: 2", 1)], [("계산식: 8 / 4", 1)])
+    CalcPipeline(plain).generate([item])
+    assert all(DISTRACTOR_HINT not in text for call in plain.calls for text in call)
+    hinted = _Scripted([("정답: 2", 1)], [("계산식: 8 / 4", 1)])
+    CalcPipeline(hinted, hint=True).generate([item])
+    assert len(hinted.calls) == 2 and all(DISTRACTOR_HINT in call[0] for call in hinted.calls)

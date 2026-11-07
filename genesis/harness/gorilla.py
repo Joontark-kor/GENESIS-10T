@@ -22,6 +22,12 @@ INSTRUCTION = ("\n\n수치를 계산해야 하면 직접 계산하지 말고, �
                "계산이 필요 없고 표에서 값을 그대로 찾는 질문이면 '계산식'을 쓰지 말고 '정답: 값'을 쓰세요.")
 RETRY_INSTRUCTION = ("\n\n직접 계산하지 말고 마지막 줄에 '계산식: <수식>' 한 줄만 쓰세요. "
                      "수식에는 질문의 숫자와 + - * / ( ) 만 사용하고, 단위(%, 원)와 '정답'은 쓰지 마세요.")
+# Optional (--distractor-hint): numbers that do not belong to what is asked are a known failure of
+# LLMs on word problems (Shi et al. 2023, "Large Language Models Can Be Easily Distracted by Irrelevant
+# Context"; arXiv 2406.15444 adds irrelevant numbers and sees ~26% relative drops). Domain-neutral wording.
+# Not yet measured here: compare calc-gorilla and calc-gorilla-hint on the same 420 items.
+DISTRACTOR_HINT = ("\n수식에는 질문이 묻는 값에 실제로 쓰이는 숫자만 넣으세요. "
+                   "'제외', '빼고', '별도'라고 한 항목이나 값과 관계없는 숫자(번호, 연도, 배송비 등)는 넣지 마세요.")
 _EXPRESSION = re.compile(r"(?:계산식|Expression|式)\s*[:：]\s*(.+)", re.IGNORECASE)
 _ANSWER = re.compile(r"정답\s*[:：]\s*(.+)")
 # arithmetic between numbers on an answer line: "134000 × (1 - 0.3)"; a bare "2023-2024" is not a formula
@@ -99,8 +105,8 @@ class CalcPipeline:
 
     name = "gorilla"
 
-    def __init__(self, base, digits: int = 2, retry: bool = True):
-        self.base, self.digits, self.retry = base, digits, retry
+    def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False):
+        self.base, self.digits, self.retry, self.hint = base, digits, retry, hint
         self.calls = self.fallbacks = self.ungrounded = self.retried = self.rescued = 0
 
     def __getattr__(self, attribute):  # hardware, precision, use_cuda, sync ...
@@ -112,7 +118,7 @@ class CalcPipeline:
             self.ungrounded += 1  # counted only: the answer text stays as the model produced it
 
     def generate(self, batch: list[dict]) -> list[tuple[str, int]]:
-        outputs = self.base.generate([with_instruction(item) for item in batch])
+        outputs = self.base.generate([with_instruction(item, INSTRUCTION + (DISTRACTOR_HINT if self.hint else "")) for item in batch])
         results: list[list] = []  # [final text, tokens, used the calculator]
         again: list[int] = []
         for index, (item, (text, n_tokens)) in enumerate(zip(batch, outputs)):
@@ -124,7 +130,7 @@ class CalcPipeline:
                 again.append(index)
             results.append([final, n_tokens, used])
         if again:
-            second = self.base.generate([with_instruction(batch[i], RETRY_INSTRUCTION) for i in again])
+            second = self.base.generate([with_instruction(batch[i], RETRY_INSTRUCTION + (DISTRACTOR_HINT if self.hint else "")) for i in again])
             for index, (text, n_tokens) in zip(again, second):
                 self.retried += 1
                 results[index][1] += n_tokens  # the retry costs tokens too

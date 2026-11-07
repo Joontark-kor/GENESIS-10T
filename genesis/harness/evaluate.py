@@ -154,7 +154,8 @@ def run(args) -> dict:
     if args.pipeline == "gorilla":
         from genesis.harness.gorilla import CalcPipeline
 
-        generator = CalcPipeline(generator, digits=args.pipeline_digits, retry=not args.no_pipeline_retry)
+        generator = CalcPipeline(generator, digits=args.pipeline_digits, retry=not args.no_pipeline_retry,
+                                hint=args.distractor_hint)
     default_scorer = args.scorer
     rows, generated_tokens = [], 0
     generator.sync()
@@ -197,7 +198,8 @@ def run(args) -> dict:
                      "pipeline_fallbacks": getattr(generator, "fallbacks", None),
                      "pipeline_ungrounded": getattr(generator, "ungrounded", None),
                      "pipeline_retried": getattr(generator, "retried", None),
-                     "pipeline_rescued": getattr(generator, "rescued", None)},
+                     "pipeline_rescued": getattr(generator, "rescued", None),
+                     "pipeline_hint": getattr(generator, "hint", None)},
         "rows": rows,
     }
     if args.out:
@@ -249,6 +251,8 @@ def main(argv: list[str] | None = None):
     r.add_argument("--pipeline-digits", type=int, default=2, help="decimals of the calculated answer")
     r.add_argument("--no-pipeline-retry", action="store_true",
                    help="gorilla: do not retry answers worked out without a formula (reproduces the 2026-11-06 numbers)")
+    r.add_argument("--distractor-hint", action="store_true",
+                   help="gorilla: tell the model to leave numbers that do not belong to the question out of the formula")
     c = sub.add_parser("compare")
     c.add_argument("reports", type=Path, nargs="+")
     args = p.parse_args(argv)
