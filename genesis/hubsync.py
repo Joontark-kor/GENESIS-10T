@@ -80,3 +80,23 @@ class Uploader(threading.Thread):
         self._stop_event.set()
         if final_push:
             self.push_once()
+
+
+def get_secret(name: str = "HF_TOKEN") -> str:
+    """Read a secret on Colab (Secrets panel), Kaggle (Add-ons > Secrets) or from the environment.
+
+    Raises RuntimeError naming where it looked; the value is never printed."""
+    import os
+    try:
+        from google.colab import userdata  # type: ignore
+        return userdata.get(name)
+    except Exception:
+        pass
+    try:
+        from kaggle_secrets import UserSecretsClient  # type: ignore
+        return UserSecretsClient().get_secret(name)
+    except Exception:
+        pass
+    if os.environ.get(name):
+        return os.environ[name]
+    raise RuntimeError(f"secret {name} not found (Colab Secrets, Kaggle Secrets or environment)")

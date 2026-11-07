@@ -25,3 +25,14 @@ def test_stop_does_a_final_push(tmp_path):
     up = Uploader("u/r", tmp_path, "tok", every=999, push=lambda *a, **k: calls.append(1))
     up.stop()
     assert calls == [1]
+
+
+def test_get_secret_falls_back_to_environment_and_names_the_miss(monkeypatch):
+    import pytest
+    from genesis.hubsync import get_secret
+    monkeypatch.setenv("GENESIS_TEST_SECRET", "abc")
+    assert get_secret("GENESIS_TEST_SECRET") == "abc"
+    monkeypatch.delenv("GENESIS_TEST_SECRET")
+    with pytest.raises(RuntimeError) as err:
+        get_secret("GENESIS_TEST_SECRET")
+    assert "GENESIS_TEST_SECRET" in str(err.value) and "abc" not in str(err.value)
