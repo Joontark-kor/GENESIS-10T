@@ -152,3 +152,22 @@ def test_distractor_hint_is_opt_in_and_reaches_first_pass_and_retry():
     hinted = _Scripted([("정답: 2", 1)], [("계산식: 8 / 4", 1)])
     CalcPipeline(hinted, hint=True).generate([item])
     assert len(hinted.calls) == 2 and all(DISTRACTOR_HINT in call[0] for call in hinted.calls)
+
+
+def test_retry_prefill_is_opt_in_and_only_on_the_retry():
+    item = {"messages": [{"role": "user", "content": "A는 8, B는 4이다. A÷B는?"}]}
+
+    class Seen:
+        def __init__(self):
+            self.batches = []
+
+        def generate(self, batch):
+            self.batches.append([x.get("prefill") for x in batch])
+            return [("정답: 2" if len(self.batches) == 1 else "계산식: 8 / 4", 1)] * len(batch)
+
+    on = Seen()
+    out = CalcPipeline(on, prefill=True).generate([item])
+    assert on.batches == [[None], ["계산식: "]] and out[0][0].endswith("정답: 2")
+    off = Seen()
+    CalcPipeline(off).generate([item])
+    assert off.batches == [[None], [None]]

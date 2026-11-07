@@ -108,17 +108,19 @@ class LocalGenerator:
 
     def generate(self, batch: list[dict]) -> list[tuple[str, int]]:
         tok = self.tokenizer
-        prompts = [render(tok, item["messages"], add_generation_prompt=True, template_kwargs=self.template_kwargs)
-                   for item in batch]
+        # an item may carry "prefill": the reply is forced to start with that text (the gorilla retry uses it)
+        prefills = [item.get("prefill", "") for item in batch]
+        prompts = [render(tok, item["messages"], add_generation_prompt=True, template_kwargs=self.template_kwargs) + pre
+                   for item, pre in zip(batch, prefills)]
         encoded = tok(prompts, return_tensors="pt", padding=True, add_special_tokens=False).to(self.device)
         with self.torch.no_grad():
             output = self.model.generate(**encoded, max_new_tokens=self.max_new_tokens, do_sample=False,
                                          pad_token_id=tok.pad_token_id)
         self.sync()
         results = []
-        for ids in output[:, encoded["input_ids"].shape[1]:]:
+        for ids, pre in zip(output[:, encoded["input_ids"].shape[1]:], prefills):
             ids = [t for t in ids.tolist() if t != tok.pad_token_id]
-            results.append((tok.decode(ids, skip_special_tokens=True), len(ids)))
+            results.append((pre + tok.decode(ids, skip_special_tokens=True), len(ids)))
         return results
 
 
@@ -155,7 +157,7 @@ def run(args) -> dict:
         from genesis.harness.gorilla import CalcPipeline
 
         generator = CalcPipeline(generator, digits=args.pipeline_digits, retry=not args.no_pipeline_retry,
-                                hint=args.distractor_hint)
+                                hint=args.distractor_hint, prefill=args.retry_prefill)
     default_scorer = args.scorer
     rows, generated_tokens = [], 0
     generator.sync()
@@ -199,7 +201,8 @@ def run(args) -> dict:
                      "pipeline_ungrounded": getattr(generator, "ungrounded", None),
                      "pipeline_retried": getattr(generator, "retried", None),
                      "pipeline_rescued": getattr(generator, "rescued", None),
-                     "pipeline_hint": getattr(generator, "hint", None)},
+                     "pipeline_hint": getattr(generator, "hint", None),
+                     "pipeline_retry_prefill": getattr(generator, "prefill", None)},
         "rows": rows,
     }
     if args.out:
@@ -253,6 +256,8 @@ def main(argv: list[str] | None = None):
                    help="gorilla: do not retry answers worked out without a formula (reproduces the 2026-11-06 numbers)")
     r.add_argument("--distractor-hint", action="store_true",
                    help="gorilla: tell the model to leave numbers that do not belong to the question out of the formula")
+    r.add_argument("--retry-prefill", action="store_true",
+                   help="gorilla: the retry reply starts with '계산식:' so the model cannot answer directly (local models only)")
     c = sub.add_parser("compare")
     c.add_argument("reports", type=Path, nargs="+")
     args = p.parse_args(argv)
