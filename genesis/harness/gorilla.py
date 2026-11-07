@@ -29,6 +29,12 @@ RETRY_INSTRUCTION = ("\n\n직접 계산하지 말고 마지막 줄에 '계산식
 DISTRACTOR_HINT = ("\n수식에는 질문이 묻는 값에 실제로 쓰이는 숫자만 넣으세요. "
                    "'제외', '빼고', '별도'라고 한 항목이나 값과 관계없는 숫자(번호, 연도, 배송비 등)는 넣지 마세요.")
 RETRY_PREFILL = "계산식: "
+# Optional (--exclude-check): the model first names the question's numbers it will NOT use ("제외: 3, 2024"),
+# then writes the formula. A formula that still contains a named number contradicts itself (seen on the hard
+# set: "수수료는 별도라 포함하지 않는다" and then "... - 4" in the formula), so it gets one retry that names them.
+EXCLUDE_HINT = ("\n계산식 바로 앞 줄에 '제외: 숫자, 숫자' 형식으로, 질문에 나오지만 식에 넣지 않을 숫자를 먼저 적으세요"
+                "(없으면 '제외: 없음').")
+_EXCLUDED = re.compile(r"제외\s*[:：]\s*(.+)")
 # Optional (--unit-hint): on the hard set CAGR was 0% because the formula gave a fraction (0.37) when the
 # question asked for a percent (37.12). Domain-neutral: the answer must be in the unit that was asked for.
 UNIT_HINT = ("\n답의 단위가 %이면 식의 결과가 퍼센트 값 그대로(0.25가 아니라 25)가 되도록 100을 곱하세요. "
@@ -111,6 +117,15 @@ def direction_flag(question: str, expression: str) -> bool:
     return any(float(a) == float(c) and float(a) != float(b) for a, b, c in _DELTA_OVER.findall(flat))
 
 
+def contradiction(reply: str, expression: str) -> list[float]:
+    """Numbers the reply said it would leave out (``제외:`` line) that the formula uses anyway."""
+    lines = _EXCLUDED.findall(reply)
+    if not lines:
+        return []
+    skipped = _numbers(lines[-1]) - _FREE
+    return sorted(skipped & _numbers(clean(expression)))
+
+
 def question_text(item: dict) -> str:
     return "\n".join(m["content"] for m in item["messages"] if m["role"] == "user")
 
@@ -134,8 +149,10 @@ class CalcPipeline:
     name = "gorilla"
 
     def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
-                 prefill: bool = False, direction_retry: bool = False, unit_hint: bool = False):
-        self.unit_hint = unit_hint
+                 prefill: bool = False, direction_retry: bool = False, unit_hint: bool = False,
+                 exclude_check: bool = False):
+        self.unit_hint, self.exclude_check = unit_hint, exclude_check
+        self.contradicted = self.contradiction_rescued = 0
         self.base, self.digits, self.retry, self.hint, self.prefill = base, digits, retry, hint, prefill
         self.direction_retry = direction_retry
         self.direction_rescued = 0
@@ -157,11 +174,11 @@ class CalcPipeline:
         return flagged
 
     def _extra(self) -> str:
-        return (DISTRACTOR_HINT if self.hint else "") + (UNIT_HINT if self.unit_hint else "")
+        return ((DISTRACTOR_HINT if self.hint else "") + (UNIT_HINT if self.unit_hint else "")
+                + (EXCLUDE_HINT if self.exclude_check else ""))
 
-    def _retry_item(self, item: dict, direction: bool = False) -> dict:
-        clone = with_instruction(item, RETRY_INSTRUCTION + self._extra()
-                                 + (DIRECTION_HINT if direction else ""))
+    def _retry_item(self, item: dict, note: str = "") -> dict:
+        clone = with_instruction(item, RETRY_INSTRUCTION + self._extra() + note)
         if self.prefill:
             clone["prefill"] = RETRY_PREFILL  # local generators force the reply to start with it
         return clone
@@ -170,28 +187,40 @@ class CalcPipeline:
         outputs = self.base.generate([with_instruction(item, INSTRUCTION + self._extra()) for item in batch])
         results: list[list] = []  # [final text, tokens, used the calculator]
         again: list[int] = []
-        flagged: set[int] = set()  # answers with a formula whose direction looks wrong (--direction-retry)
+        flagged: dict[int, str] = {}  # formulas to redo with a note: wrong direction / contradicts its own 제외 line
         for index, (item, (text, n_tokens)) in enumerate(zip(batch, outputs)):
             final, used = finish(text, self.digits)
             self.calls += 1
             if used:
-                if self._check_grounding(item, text) and self.direction_retry:
+                wrong_way = self._check_grounding(item, text)
+                clash = contradiction(text, expression_of(text) or "") if self.exclude_check else []
+                self.contradicted += bool(clash)
+                if clash:
+                    note = f"\n식에 {', '.join(f'{n:g}' for n in clash)}을(를) 넣지 마세요. 제외한 숫자입니다."
                     again.append(index)
-                    flagged.add(index)
+                    flagged[index] = note
+                elif wrong_way and self.direction_retry:
+                    again.append(index)
+                    flagged[index] = DIRECTION_HINT
             elif self.retry and not looked_up(question_text(item), text):
                 again.append(index)
             results.append([final, n_tokens, used])
         if again:
-            second = self.base.generate([self._retry_item(batch[i], i in flagged) for i in again])
+            second = self.base.generate([self._retry_item(batch[i], flagged.get(i, '')) for i in again])
             for index, (text, n_tokens) in zip(again, second):
                 self.retried += 1
                 results[index][1] += n_tokens  # the retry costs tokens too
                 final, used = finish(text, self.digits)
                 if not used:
                     continue
-                if index in flagged:  # keep the first answer unless the retry fixed the direction
-                    if not self._check_grounding(batch[index], text):
-                        self.direction_rescued += 1
+                if index in flagged:  # keep the first answer unless the retry fixed what was flagged
+                    again_wrong = self._check_grounding(batch[index], text)
+                    clash = contradiction(text, expression_of(text) or "") if self.exclude_check else []
+                    if not clash and not (again_wrong and flagged[index] == DIRECTION_HINT):
+                        if flagged[index] == DIRECTION_HINT:
+                            self.direction_rescued += 1
+                        else:
+                            self.contradiction_rescued += 1
                         results[index][0] = final
                     continue
                 self.rescued += 1
