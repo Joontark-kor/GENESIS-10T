@@ -29,6 +29,10 @@ RETRY_INSTRUCTION = ("\n\n직접 계산하지 말고 마지막 줄에 '계산식
 DISTRACTOR_HINT = ("\n수식에는 질문이 묻는 값에 실제로 쓰이는 숫자만 넣으세요. "
                    "'제외', '빼고', '별도'라고 한 항목이나 값과 관계없는 숫자(번호, 연도, 배송비 등)는 넣지 마세요.")
 RETRY_PREFILL = "계산식: "
+# Optional (--unit-hint): on the hard set CAGR was 0% because the formula gave a fraction (0.37) when the
+# question asked for a percent (37.12). Domain-neutral: the answer must be in the unit that was asked for.
+UNIT_HINT = ("\n답의 단위가 %이면 식의 결과가 퍼센트 값 그대로(0.25가 아니라 25)가 되도록 100을 곱하세요. "
+             "질문이 요구한 단위로 답이 나와야 합니다.")
 # Optional (--direction-retry): sent only when direction_flag fired on a rate-of-change formula.
 DIRECTION_HINT = ("\n증감률·성장률은 (나중 값 - 처음 값) / 처음 값입니다. 나누는 수는 비교의 출발점인 처음(기준) 값이고, "
                   "값이 줄었으면 결과는 음수입니다.")
@@ -130,7 +134,8 @@ class CalcPipeline:
     name = "gorilla"
 
     def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
-                 prefill: bool = False, direction_retry: bool = False):
+                 prefill: bool = False, direction_retry: bool = False, unit_hint: bool = False):
+        self.unit_hint = unit_hint
         self.base, self.digits, self.retry, self.hint, self.prefill = base, digits, retry, hint, prefill
         self.direction_retry = direction_retry
         self.direction_rescued = 0
@@ -151,15 +156,18 @@ class CalcPipeline:
         self.direction += flagged
         return flagged
 
+    def _extra(self) -> str:
+        return (DISTRACTOR_HINT if self.hint else "") + (UNIT_HINT if self.unit_hint else "")
+
     def _retry_item(self, item: dict, direction: bool = False) -> dict:
-        clone = with_instruction(item, RETRY_INSTRUCTION + (DISTRACTOR_HINT if self.hint else "")
+        clone = with_instruction(item, RETRY_INSTRUCTION + self._extra()
                                  + (DIRECTION_HINT if direction else ""))
         if self.prefill:
             clone["prefill"] = RETRY_PREFILL  # local generators force the reply to start with it
         return clone
 
     def generate(self, batch: list[dict]) -> list[tuple[str, int]]:
-        outputs = self.base.generate([with_instruction(item, INSTRUCTION + (DISTRACTOR_HINT if self.hint else "")) for item in batch])
+        outputs = self.base.generate([with_instruction(item, INSTRUCTION + self._extra()) for item in batch])
         results: list[list] = []  # [final text, tokens, used the calculator]
         again: list[int] = []
         flagged: set[int] = set()  # answers with a formula whose direction looks wrong (--direction-retry)

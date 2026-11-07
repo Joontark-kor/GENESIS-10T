@@ -229,3 +229,21 @@ def test_direction_retry_is_opt_in_and_only_replaces_with_a_fixed_formula():
 def test_direction_flag_skips_decrease_rate_questions():
     from genesis.harness.gorilla import direction_flag
     assert direction_flag("7240에서 3320으로. 감소율은?", "(7240 - 3320) / 7240 * 100") is False
+
+
+def test_unit_hint_is_opt_in_and_reaches_first_pass_and_retry():
+    from genesis.harness.gorilla import CalcPipeline, UNIT_HINT
+
+    class Fake:
+        def __init__(self):
+            self.prompts = []
+
+        def generate(self, batch):
+            self.prompts += [b["messages"][-1]["content"] for b in batch]
+            return [("정답: 99", 2) for _ in batch]  # a number worked out in its head: the retry runs
+
+    item = {"messages": [{"role": "user", "content": "q 몇 %인가?"}]}
+    off = Fake(); CalcPipeline(off).generate([item])
+    assert all(UNIT_HINT not in p for p in off.prompts)
+    on = Fake(); CalcPipeline(on, unit_hint=True).generate([item])
+    assert len(on.prompts) == 2 and all(UNIT_HINT in p for p in on.prompts)
