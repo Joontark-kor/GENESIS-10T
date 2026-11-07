@@ -28,6 +28,7 @@ RETRY_INSTRUCTION = ("\n\n직접 계산하지 말고 마지막 줄에 '계산식
 # Not yet measured here: compare calc-gorilla and calc-gorilla-hint on the same 420 items.
 DISTRACTOR_HINT = ("\n수식에는 질문이 묻는 값에 실제로 쓰이는 숫자만 넣으세요. "
                    "'제외', '빼고', '별도'라고 한 항목이나 값과 관계없는 숫자(번호, 연도, 배송비 등)는 넣지 마세요.")
+RETRY_PREFILL = "계산식: "
 _EXPRESSION = re.compile(r"(?:계산식|Expression|式)\s*[:：]\s*(.+)", re.IGNORECASE)
 _ANSWER = re.compile(r"정답\s*[:：]\s*(.+)")
 # arithmetic between numbers on an answer line: "134000 × (1 - 0.3)"; a bare "2023-2024" is not a formula
@@ -105,8 +106,9 @@ class CalcPipeline:
 
     name = "gorilla"
 
-    def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False):
-        self.base, self.digits, self.retry, self.hint = base, digits, retry, hint
+    def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
+                 prefill: bool = False):
+        self.base, self.digits, self.retry, self.hint, self.prefill = base, digits, retry, hint, prefill
         self.calls = self.fallbacks = self.ungrounded = self.retried = self.rescued = 0
 
     def __getattr__(self, attribute):  # hardware, precision, use_cuda, sync ...
@@ -116,6 +118,12 @@ class CalcPipeline:
         expression = expression_of(reply)
         if expression is not None and ungrounded(question_text(item), expression):
             self.ungrounded += 1  # counted only: the answer text stays as the model produced it
+
+    def _retry_item(self, item: dict) -> dict:
+        clone = with_instruction(item, RETRY_INSTRUCTION + (DISTRACTOR_HINT if self.hint else ""))
+        if self.prefill:
+            clone["prefill"] = RETRY_PREFILL  # local generators force the reply to start with it
+        return clone
 
     def generate(self, batch: list[dict]) -> list[tuple[str, int]]:
         outputs = self.base.generate([with_instruction(item, INSTRUCTION + (DISTRACTOR_HINT if self.hint else "")) for item in batch])
@@ -130,7 +138,7 @@ class CalcPipeline:
                 again.append(index)
             results.append([final, n_tokens, used])
         if again:
-            second = self.base.generate([with_instruction(batch[i], RETRY_INSTRUCTION + (DISTRACTOR_HINT if self.hint else "")) for i in again])
+            second = self.base.generate([self._retry_item(batch[i]) for i in again])
             for index, (text, n_tokens) in zip(again, second):
                 self.retried += 1
                 results[index][1] += n_tokens  # the retry costs tokens too
