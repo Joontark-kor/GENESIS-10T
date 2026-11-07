@@ -41,6 +41,6 @@ def test_hard_set_has_finite_golds_and_reference_parses_back(tmp_path):
 
 def test_caret_is_read_as_a_power_not_rejected():
     from genesis.tools import calculate
-    assert calculate("2200 * (1 + 0.045)^2 - 3") == __import__("pytest").approx(2402.45, abs=0.01)
+    assert calculate("2200 * (1 + 0.045)^2 - 3") == __import__("pytest").approx(2399.455, abs=0.01)
     assert calculate("(5829/3100)^(1/2)-1") == __import__("pytest").approx(0.3713, abs=1e-3)
     assert calculate("2^3") == 8
