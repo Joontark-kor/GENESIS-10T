@@ -157,7 +157,8 @@ def run(args) -> dict:
         from genesis.harness.gorilla import CalcPipeline
 
         generator = CalcPipeline(generator, digits=args.pipeline_digits, retry=not args.no_pipeline_retry,
-                                hint=args.distractor_hint, prefill=args.retry_prefill)
+                                hint=args.distractor_hint, prefill=args.retry_prefill,
+                                direction_retry=args.direction_retry)
     default_scorer = args.scorer
     rows, generated_tokens = [], 0
     generator.sync()
@@ -200,6 +201,8 @@ def run(args) -> dict:
                      "pipeline_fallbacks": getattr(generator, "fallbacks", None),
                      "pipeline_ungrounded": getattr(generator, "ungrounded", None),
                      "pipeline_direction": getattr(generator, "direction", None),
+                     "pipeline_direction_retry": getattr(generator, "direction_retry", None),
+                     "pipeline_direction_rescued": getattr(generator, "direction_rescued", None),
                      "pipeline_retried": getattr(generator, "retried", None),
                      "pipeline_rescued": getattr(generator, "rescued", None),
                      "pipeline_hint": getattr(generator, "hint", None),
@@ -259,6 +262,8 @@ def main(argv: list[str] | None = None):
                    help="gorilla: tell the model to leave numbers that do not belong to the question out of the formula")
     r.add_argument("--retry-prefill", action="store_true",
                    help="gorilla: the retry reply starts with '계산식:' so the model cannot answer directly (local models only)")
+    r.add_argument("--direction-retry", action="store_true",
+                   help="gorilla: retry once, with a hint, when a rate-of-change formula divides by the new value")
     c = sub.add_parser("compare")
     c.add_argument("reports", type=Path, nargs="+")
     args = p.parse_args(argv)
