@@ -52,10 +52,10 @@ def _percent(match: re.Match) -> str:
 
 
 def clean(expression: str) -> str:
-    """Normalize what models tend to write: thousands separators, × ÷ −, a trailing '= result'."""
+    """Normalize what models tend to write: thousands separators, × ÷ −, ^ as a power, a trailing '= result'."""
     text = expression.translate(_TRANSLATE).split("=")[0].replace(",", "")
     text = _PERCENT.sub(_percent, text)
-    return text.replace("%", "").strip()
+    return text.replace("%", "").replace("^", "**").strip()  # models write 2^3 for a power (Python would read XOR)
 
 
 def calculate(expression: str) -> float:
