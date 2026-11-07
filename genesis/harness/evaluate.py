@@ -199,6 +199,7 @@ def run(args) -> dict:
                      "pipeline": args.pipeline, "pipeline_digits": args.pipeline_digits if args.pipeline != "none" else None,
                      "pipeline_fallbacks": getattr(generator, "fallbacks", None),
                      "pipeline_ungrounded": getattr(generator, "ungrounded", None),
+                     "pipeline_direction": getattr(generator, "direction", None),
                      "pipeline_retried": getattr(generator, "retried", None),
                      "pipeline_rescued": getattr(generator, "rescued", None),
                      "pipeline_hint": getattr(generator, "hint", None),

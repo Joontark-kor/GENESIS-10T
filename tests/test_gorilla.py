@@ -171,3 +171,32 @@ def test_retry_prefill_is_opt_in_and_only_on_the_retry():
     off = Seen()
     CalcPipeline(off).generate([item])
     assert off.batches == [[None], [None]]
+
+
+def test_ungrounded_accepts_percent_forms_of_question_numbers():
+    from genesis.harness.gorilla import ungrounded
+    question = "원금 480만원, 연 3% 단리로 4년"
+    assert ungrounded(question, "4800000 * 0.03 * 4") == [4800000.0]  # 480 is present, 4800000 is not
+    assert ungrounded(question, "480 * 0.03 * 4") == []
+    assert ungrounded("정가 200원, 할인율 0.15", "200 * 15 / 100") == []
+
+
+def test_direction_flag_catches_dividing_by_the_new_value():
+    from genesis.harness.gorilla import direction_flag
+    question = "3,320에서 7,240으로 바뀌었다. 증감률은 몇 %인가?"
+    assert direction_flag(question, "(7240 - 3320) / 7240 * 100") is True
+    assert direction_flag(question, "(7240 - 3320) / 3320 * 100") is False
+    assert direction_flag("평균은?", "(7240 - 3320) / 7240") is False  # not a rate question
+
+
+def test_pipeline_counts_direction_flags_without_changing_the_answer():
+    from genesis.harness.gorilla import CalcPipeline
+
+    class Fake:
+        def generate(self, batch):
+            return [("계산식: (7240 - 3320) / 7240 * 100", 3)]
+
+    item = {"messages": [{"role": "user", "content": "3320에서 7240으로. 증감률은?"}]}
+    pipeline = CalcPipeline(Fake())
+    out = pipeline.generate([item])
+    assert pipeline.direction == 1 and out[0][0].endswith("정답: 54.14")
