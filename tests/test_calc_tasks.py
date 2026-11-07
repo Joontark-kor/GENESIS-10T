@@ -23,3 +23,17 @@ def test_reference_answer_parses_back_to_gold():
 def test_same_seed_same_items(tmp_path):
     build(tmp_path / "a", 5, 7); build(tmp_path / "b", 5, 7)
     assert (tmp_path / "a/eval_test.jsonl").read_text(encoding="utf-8") == (tmp_path / "b/eval_test.jsonl").read_text(encoding="utf-8")
+
+
+def test_hard_set_has_finite_golds_and_reference_parses_back(tmp_path):
+    import json
+    from genesis_calc.build_tasks import HARD_KINDS, make_hard
+    manifest = build(tmp_path, per_kind=15, seed=2, kinds_set="hard")
+    assert manifest["items"] == 15 * len(HARD_KINDS) and manifest["set"] == "hard"
+    rows = [json.loads(x) for x in (tmp_path / "eval_test.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert len({r["messages"][1]["content"] for r in rows}) == len(rows)
+    rng = random.Random(0)
+    for kind in HARD_KINDS:
+        for _ in range(20):
+            _, gold, tol = make_hard(kind, rng)
+            assert 0 < gold < 1e6 and abs(parse_number(f"정답: {gold:g}") - gold) <= tol
