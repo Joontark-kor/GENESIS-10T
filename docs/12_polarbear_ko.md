@@ -1,5 +1,7 @@
 # Polarbear — 모델은 식을 쓰고, 계산은 계산기가 한다
 
+> **옵션 정리 (2026-11-08):** 측정에서 효과가 없었던 `--direction-retry`, `--multistep`, `--prose-retry`, `--lookup-hint`는 코드에서 뺐다. 아래 절의 측정 기록은 그대로 둔다(같은 실패를 다시 시도하지 않도록). 남은 선택 옵션: `--distractor-hint`, `--retry-prefill`, `--unit-hint`, `--exclude-check`(방해 숫자가 있는 문제 전용), `--route`.
+
 ## 왜 만들었나
 
 fin-v1 첫 QLoRA(2026-11-05): 전체 정확도 85.3% → 84.0%, 개선 없음. 틀린 답을 읽어 보니 수식은 맞게 쓰는데

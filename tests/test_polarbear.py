@@ -203,28 +203,6 @@ def test_pipeline_counts_direction_flags_without_changing_the_answer():
     assert pipeline.direction == 1 and out[0][0].endswith("정답: 54.14")
 
 
-def test_direction_retry_is_opt_in_and_only_replaces_with_a_fixed_formula():
-    from genesis.harness.polarbear import CalcPipeline
-
-    class Fake:
-        def __init__(self):
-            self.prompts = []
-
-        def generate(self, batch):
-            self.prompts.append([b["messages"][-1]["content"] for b in batch])
-            if len(self.prompts) == 1:
-                return [("계산식: (7240 - 3320) / 7240 * 100", 3)]
-            return [("계산식: (7240 - 3320) / 3320 * 100", 3)]
-
-    item = {"messages": [{"role": "user", "content": "3320에서 7240으로. 증감률은?"}]}
-    off = CalcPipeline(Fake())
-    assert off.generate([item])[0][0].endswith("정답: 54.14") and off.retried == 0
-    fake = Fake()
-    on = CalcPipeline(fake, direction_retry=True)
-    out = on.generate([item])
-    assert out[0][0].endswith("정답: 118.07") and on.direction_rescued == 1
-    assert "처음 값" in fake.prompts[1][0]  # the hint reached the retry only
-    assert "처음 값" not in fake.prompts[0][0]
 
 
 def test_direction_flag_skips_decrease_rate_questions():
@@ -291,14 +269,6 @@ def test_square_in_formula_is_structure_and_percent_question_without_100_is_flag
     assert not percent_flag("할인가는 몇 원인가?", "12000 * (1 - 15%)")
 
 
-def test_multistep_formulas_are_joined_and_calculated_once():
-    from genesis.harness.polarbear import expression_of, finish, ungrounded
-    reply = "계산식: 1000 * 5 / 100\n계산식: 1000 + #1"
-    assert expression_of(reply) == "1000 + (1000 * 5 / 100)"
-    assert finish(reply)[0].endswith("정답: 1050") and finish(reply)[1]
-    assert ungrounded("원금 1000, 이율 5%", expression_of(reply)) == []
-    assert expression_of("계산식: 2 + #3") == "2 + #3"  # a reference to nothing stays and fails the calculation
-    assert not finish("계산식: 2 + #3")[1]
 
 
 def test_scaled_units_are_not_made_up_and_missing_parentheses_before_100_is_flagged():
@@ -319,43 +289,8 @@ def test_prose_mismatch_flags_a_formula_that_stops_early_and_ignores_agreement()
     assert prose_mismatch(q, "계산식: 2300 * 2", 4600.0) is None  # no prose at all
 
 
-def test_prose_retry_replaces_a_dropped_step_formula_only_when_the_retry_agrees_with_its_prose():
-    from genesis.harness.polarbear import CalcPipeline
-
-    class Fake:
-        def __init__(self, *outs):
-            self.outs = list(outs)
-
-        def generate(self, batch):
-            return [(self.outs.pop(0), 5) for _ in batch]
-
-    q = {"messages": [{"role": "user", "content": "2300만원을 연 7% 단리로 9년 빌렸다. 108개월로 나누면 매달 몇 만원인가?"}]}
-    first = "합계 3749를 108로 나누면 34.71만원입니다.\n계산식: 2300 + 2300 * 0.07 * 9"
-    fixed = "나누면 34.71만원입니다.\n계산식: (2300 + 2300 * 0.07 * 9) / 108"
-    pipe = CalcPipeline(Fake(first, fixed), prose_retry=True)
-    assert pipe.generate([q])[0][0].endswith("정답: 34.71") and pipe.prose_flagged == 1 and pipe.prose_rescued == 1
-    stuck = CalcPipeline(Fake(first, first), prose_retry=True)  # the same formula again: keep the first answer
-    assert stuck.generate([q])[0][0].endswith("정답: 3749") and stuck.prose_rescued == 0
-    off = CalcPipeline(Fake(first))
-    assert off.generate([q])[0][0].endswith("정답: 3749") and off.prose_flagged == 0
 
 
-def test_lookup_hint_is_added_to_the_request_only_when_asked():
-    from genesis.harness.polarbear import LOOKUP_HINT, CalcPipeline
-
-    class Echo:
-        def __init__(self):
-            self.sent = []
-
-        def generate(self, batch):
-            self.sent += [b["messages"][-1]["content"] for b in batch]
-            return [("정답: 서울", 3) for _ in batch]
-
-    item = {"messages": [{"role": "user", "content": "가장 많은 곳은?"}]}
-    on, off = Echo(), Echo()
-    CalcPipeline(on, lookup_hint=True).generate([item])
-    CalcPipeline(off).generate([item])
-    assert LOOKUP_HINT in on.sent[0] and LOOKUP_HINT not in off.sent[0]
 
 
 def test_route_keeps_a_plain_value_read_off_the_question_and_formulas_the_rest():
