@@ -307,3 +307,13 @@ def test_scaled_units_are_not_made_up_and_missing_parentheses_before_100_is_flag
     assert ungrounded("2,000억원에서 3,500억원", "3500/2000") == []
     assert percent_flag("성장률은 몇 %인가?", "(3500/2000)^(1/3)-1*100")
     assert not percent_flag("성장률은 몇 %인가?", "((3500/2000)^(1/3)-1)*100")
+
+
+def test_prose_mismatch_flags_a_formula_that_stops_early_and_ignores_agreement():
+    from genesis.harness.gorilla import prose_mismatch
+    q = "2300만원을 연 7% 단리로 9년 빌렸다. 108개월로 나누면 매달 몇 만원인가?"
+    bad = "총 이자는 2300 × 0.07 × 9 = 1449, 합계 3749, 108개월로 나누면 34.71만원입니다.\n\n계산식: (2300 + 2300 * 0.07 * 9)\n정답: 3749"
+    assert prose_mismatch(q, bad, 3749.0) == 34.71
+    good = "합계 3749를 108로 나누면 34.71만원입니다.\n계산식: (2300 + 2300 * 0.07 * 9) / 108"
+    assert prose_mismatch(q, good, 34.712962) is None
+    assert prose_mismatch(q, "계산식: 2300 * 2", 4600.0) is None  # no prose at all

@@ -160,6 +160,24 @@ def contradiction(reply: str, expression: str) -> list[float]:
     return sorted(skipped & _numbers(clean(expression)))
 
 
+def prose_mismatch(question: str, reply: str, value: float) -> float | None:
+    """The number the reply's own prose arrived at when it differs from the calculated ``value``, else None.
+
+    Seen on the multi-step set: the prose solved the problem (34.71) but the ``계산식:`` line held only the
+    first step (3749). The last number in the text before the formula that is not in the question is the
+    prose's answer; if the calculator disagrees, the formula probably dropped a step. A signal only
+    (the prose can also stop at an intermediate figure), so it is a warning, not a retry.
+    """
+    marker = _EXPRESSION.search(reply)
+    prose = reply[:marker.start()] if marker else reply
+    asked = _numbers(question)
+    figures = [n for n in (float(m) for m in _NUMBER.findall(prose.replace(",", ""))) if n not in asked]
+    if not figures:
+        return None
+    said = figures[-1]
+    return said if abs(said - value) > max(0.01, abs(value) * 1e-3) else None
+
+
 def question_text(item: dict) -> str:
     return "\n".join(m["content"] for m in item["messages"] if m["role"] == "user")
 
