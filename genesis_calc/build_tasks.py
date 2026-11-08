@@ -27,6 +27,7 @@ KINDS = ("percent_change", "discount", "tax_inclusive", "average", "simple_inter
 
 LOOKUP_KINDS = ("table_value", "pick_max", "pick_min", "count_over")
 MULTI_KINDS = ("discount_tax_split", "loan_monthly", "net_profit", "trip_time")
+UNIT_KINDS = ("temp_f", "speed_ms", "work_minutes", "recipe_scale")
 HARD_KINDS = ("compound_interest", "cagr", "bmi", "electric_power", "fuel_cost", "molarity")
 
 
@@ -151,9 +152,30 @@ def make_multi(kind: str, rng: random.Random) -> tuple[str, float, float]:
     raise ValueError(kind)
 
 
+def make_units(kind: str, rng: random.Random) -> tuple[str, float, float]:
+    """(question, gold, tolerance) for the unit set: a conversion factor is part of the problem."""
+    if kind == "temp_f":
+        c = rng.randint(-10, 38)
+        return (f"섭씨 {c}도는 화씨로 몇 도인가? (화씨 = 섭씨 x 9 / 5 + 32, 소수 둘째 자리)", _round(c * 9 / 5 + 32), 0.01)
+    if kind == "speed_ms":
+        v = rng.randint(20, 140)
+        return (f"시속 {v}km로 달리는 차의 속도는 초속 몇 미터인가? (1km는 1000m, 1시간은 3600초, 소수 둘째 자리)",
+                _round(v * 1000 / 3600), 0.01)
+    if kind == "work_minutes":
+        h1, m1, h2, m2 = rng.randint(1, 5), rng.randint(5, 55), rng.randint(1, 5), rng.randint(5, 55)
+        return (f"첫 작업은 {h1}시간 {m1}분, 두 번째 작업은 {h2}시간 {m2}분 걸렸다. 두 작업의 시간을 합하면 모두 몇 분인가?",
+                float(h1 * 60 + m1 + h2 * 60 + m2), 0.0)
+    if kind == "recipe_scale":
+        base, g, want = rng.choice([2, 3, 4]), rng.randint(5, 40) * 10, rng.randint(5, 12)
+        return (f"{base}인분 레시피에 밀가루 {g}g이 들어간다. {want}인분을 만들려면 밀가루는 몇 g이 필요한가? (소수 둘째 자리)",
+                _round(g * want / base), 0.01)
+    raise ValueError(kind)
+
+
 def build(out: Path, per_kind: int, seed: int, kinds_set: str = "basic") -> dict:
     kinds, maker = {"hard": (HARD_KINDS, make_hard), "multi": (MULTI_KINDS, make_multi),
-                    "lookup": (LOOKUP_KINDS, make_lookup)}.get(kinds_set, (KINDS, make))
+                    "lookup": (LOOKUP_KINDS, make_lookup),
+                    "units": (UNIT_KINDS, make_units)}.get(kinds_set, (KINDS, make))
     out.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
     items, seen = [], set()
@@ -185,7 +207,7 @@ def main() -> None:
     p.add_argument("--out", type=Path, default=Path("data/applied/calc_v1"))
     p.add_argument("--per-kind", type=int, default=60)
     p.add_argument("--seed", type=int, default=1)
-    p.add_argument("--set", dest="kinds_set", choices=("basic", "hard", "multi", "lookup"), default="basic")
+    p.add_argument("--set", dest="kinds_set", choices=("basic", "hard", "multi", "lookup", "units"), default="basic")
     args = p.parse_args()
     print(json.dumps(build(args.out, args.per_kind, args.seed, args.kinds_set), ensure_ascii=False, indent=2))
 
