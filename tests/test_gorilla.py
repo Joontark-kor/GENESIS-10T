@@ -279,3 +279,12 @@ def test_exclude_check_retries_a_self_contradicting_formula_and_keeps_the_fixed_
     out = on.generate([item])
     assert out[0][0].endswith("정답: 100") and on.contradiction_rescued == 1 and on.contradicted == 1
     assert "제외한 숫자" in fake.prompts[1][0] and "제외:" in fake.prompts[0][0]
+
+
+def test_square_in_formula_is_structure_and_percent_question_without_100_is_flagged():
+    from genesis.harness.gorilla import percent_flag, ungrounded
+    assert ungrounded("90kg, 키 180cm인 사람의 BMI는?", "90/(1.8^2)") == []
+    assert ungrounded("90kg, 키 180cm인 사람의 BMI는?", "90/(1.8**2) + 7") == [7.0]
+    assert percent_flag("연평균 성장률은 몇 %인가?", "(3500/2000)^(1/3) - 1")
+    assert not percent_flag("연평균 성장률은 몇 %인가?", "((3500/2000)^(1/3) - 1) * 100")
+    assert not percent_flag("할인가는 몇 원인가?", "12000 * (1 - 15%)")

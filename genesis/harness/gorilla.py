@@ -97,7 +97,19 @@ def ungrounded(question: str, expression: str) -> list[float]:
     asked = _numbers(question)
     present = asked | _FREE  # 1 and 100 are structure (growth = x/y - 1, percent = * 100)
     present |= {round(n / 100, 10) for n in asked} | {round(n * 100, 10) for n in asked}
-    return sorted(n for n in _numbers(clean(expression)) if round(n, 10) not in present)
+    flat = re.sub(r"\*\*\s*\(?\s*[23]\s*\)?(?![\d.])", "", clean(expression))  # a square or cube is structure, not a made-up figure
+    return sorted(n for n in _numbers(flat) if round(n, 10) not in present)
+
+
+_ASKS_PERCENT = re.compile(r"몇\s*(?:%|퍼센트|프로)")
+
+
+def percent_flag(question: str, expression: str) -> bool:
+    """True when the question asks "몇 %" but the formula has no ``100`` and no ``%``: it likely returns a fraction.
+
+    Only this shape is checked, so a False says nothing (the formula may reach 100 some other way).
+    """
+    return bool(_ASKS_PERCENT.search(question)) and "100" not in expression and "%" not in expression
 
 
 _RATE = re.compile(r"증감률|증가율|성장률|변화율|변동률|증가폭")  # not 감소율: (old - new) / old is right there
