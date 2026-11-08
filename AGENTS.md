@@ -17,7 +17,7 @@ GENESIS is a three-layer base for the owner's work: (1) base weights (open model
 |---|---|
 | `genesis/adapt/` | data format + LoRA/QLoRA fine-tuning (`python -m genesis.adapt.finetune`) |
 | `genesis/harness/` | evaluation harness + scorers (`python -m genesis.harness.evaluate run\|compare`) |
-| `genesis/serving/` | OpenAI-compatible endpoint (vLLM / Ollama / local) |
+| `genesis/serving/` | OpenAI-compatible endpoint (vLLM / Ollama / local); `calc.py` = `CalcClient`: model writes the formula, calculator answers, result carries formula + warnings |
 | `genesis/safety.py` | `SafetyCheck` protocol, `AllowAll`, `guarded_chat` (interface only) |
 | `genesis/precision.py` | bf16 on CUDA capability >= 8, fp16 on T4, fp32 on CPU |
 | `genesis_fin/` | first application: OpenDART finance tasks (depends on core, never the reverse) |
@@ -39,7 +39,7 @@ Data paths (`data/applied/fin_v1`, `runs/applied`, `reports/applied`) are kept f
 ```bash
 pip install -e ".[dev]"          # core + tests
 pip install -e ".[fin,qlora]"    # finance task building + QLoRA (GPU machines)
-python -m pytest -q              # 105 passed, 3 skipped (no GPU needed)
+python -m pytest -q              # 129 passed, 3 skipped (no GPU needed)
 ```
 
 ## Conventions

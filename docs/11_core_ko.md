@@ -72,3 +72,21 @@ genesis (코어, 공개)  ──▶  genesis_fin (공개 적용)
 ```
 
 코어는 어떤 적용도 import하지 않는다. `tests/test_boundaries.py`가 이것을 검사한다. 적용 쪽 요구는 적용 저장소에서 처리하고, 코어에는 분야 중립적인 기능으로만 들어온다.
+
+
+## 계산이 필요한 질문: `CalcClient` (2026-11-08)
+
+앱이 숫자 질문을 할 때는 점수가 아니라 **어떤 식으로 나온 값인지**가 필요하다. `genesis.serving.calc.CalcClient`는 엔드포인트에 질문하고,
+모델이 쓴 식을 계산기(`genesis.tools.calculate`)로 계산해 돌려준다. 결과(`CalcResult`)에는 값(`answer`), 식(`formula`), 계산기 사용 여부,
+재시도 여부, 그리고 확인할 점(`warnings`: 식 없이 답함 / 질문에 없는 숫자 / 증감률 방향 의심)이 들어 있다.
+
+```python
+from genesis.serving import EndpointClient
+from genesis.serving.calc import CalcClient
+result = CalcClient(EndpointClient("http://localhost:8000/v1"), "fin").ask([{"role": "user", "content": "정가 12,000원, 15% 할인가는?"}])
+print(result.answer, result.formula, result.warnings)
+```
+
+- 앱은 `warnings`가 비어 있을 때만 값을 그대로 쓰고, 아니면 사람에게 확인을 요청하거나 식을 보여주는 식으로 쓸 수 있다.
+- 실험 옵션(제외 검사 등)은 평가 하네스 전용이다. 서빙 쪽에는 검증된 기본 동작과 `--distractor-hint`만 둔다.
+- 비공개 컴패니언 쪽 연결(대화 설계, 안전 파이프라인)은 이 저장소에 두지 않는다. 이 클라이언트는 엔드포인트만 부른다.
