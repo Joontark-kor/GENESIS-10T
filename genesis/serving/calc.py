@@ -15,7 +15,7 @@ import json
 from dataclasses import asdict, dataclass, field
 
 from genesis.harness.gorilla import (CalcPipeline, direction_flag, expression_of, looked_up, percent_flag,
-                                     question_text, ungrounded)
+                                     prose_mismatch, question_text, ungrounded)
 from genesis.serving.endpoint import EndpointClient
 from genesis.tools import CalculationError, calculate, format_number
 
@@ -75,7 +75,8 @@ class CalcClient:
         answer, warnings = None, []
         if formula is not None:
             try:
-                answer = format_number(calculate(formula), self.digits)
+                value = calculate(formula)
+                answer = format_number(value, self.digits)
             except CalculationError:
                 warnings.append("식을 계산하지 못했습니다")
             else:
@@ -84,6 +85,9 @@ class CalcClient:
                     warnings.append("질문에 없는 숫자가 식에 있습니다: " + ", ".join(f"{n:g}" for n in missing))
                 if direction_flag(question_text(item), formula):
                     warnings.append("증감률 식의 방향(부호)을 확인하세요")
+                said = prose_mismatch(question_text(item), text, value)
+                if said is not None:
+                    warnings.append(f"설명에서는 {said:g}이라고 했는데 식의 계산 결과는 {answer}입니다: 식에 단계가 빠졌을 수 있습니다")
                 if percent_flag(question_text(item), formula):
                     warnings.append("%를 물었는데 식에 100(또는 %)이 없습니다: 소수로 나왔을 수 있습니다")
         elif not looked_up(question_text(item), text):  # an answer read off the question, or a name, needs no formula
