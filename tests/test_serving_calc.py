@@ -82,3 +82,12 @@ def test_unit_hint_reaches_the_first_request():
     quiet = FakeEndpoint("계산식: 12000 * 0.85")
     CalcClient(quiet, "m").ask([{"role": "user", "content": "할인가는?"}])
     assert "100을 곱하세요" not in quiet.calls[0]
+
+
+def test_multistep_hint_is_sent_only_when_asked_and_steps_give_one_answer():
+    fake = FakeEndpoint("계산식: 12000 * 15 / 100\n계산식: 12000 - #1")
+    result = CalcClient(fake, "m", multistep=True).ask([{"role": "user", "content": "정가 12,000원, 15% 할인가는?"}])
+    assert "#1" in fake.calls[0] and result.answer == "10200"
+    plain = FakeEndpoint("계산식: 12000 * 0.85")
+    CalcClient(plain, "m").ask([{"role": "user", "content": "할인가는?"}])
+    assert "#1" not in plain.calls[0]

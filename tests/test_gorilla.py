@@ -288,3 +288,13 @@ def test_square_in_formula_is_structure_and_percent_question_without_100_is_flag
     assert percent_flag("연평균 성장률은 몇 %인가?", "(3500/2000)^(1/3) - 1")
     assert not percent_flag("연평균 성장률은 몇 %인가?", "((3500/2000)^(1/3) - 1) * 100")
     assert not percent_flag("할인가는 몇 원인가?", "12000 * (1 - 15%)")
+
+
+def test_multistep_formulas_are_joined_and_calculated_once():
+    from genesis.harness.gorilla import expression_of, finish, ungrounded
+    reply = "계산식: 1000 * 5 / 100\n계산식: 1000 + #1"
+    assert expression_of(reply) == "1000 + (1000 * 5 / 100)"
+    assert finish(reply)[0].endswith("정답: 1050") and finish(reply)[1]
+    assert ungrounded("원금 1000, 이율 5%", expression_of(reply)) == []
+    assert expression_of("계산식: 2 + #3") == "2 + #3"  # a reference to nothing stays and fails the calculation
+    assert not finish("계산식: 2 + #3")[1]
