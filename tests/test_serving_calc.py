@@ -73,3 +73,12 @@ def test_prefill_is_off_by_default_and_a_non_numeric_answer_gets_no_warning():
     assert not result.used_calculator and all("continue_final_message" not in e for _, e in fake.calls)
     quiet, _ = ask("정답: 서울", question="대한민국의 수도는 어디인가?")
     assert quiet.warnings == []
+
+
+def test_unit_hint_reaches_the_first_request():
+    fake = FakeEndpoint("계산식: 12000 * 0.85")
+    CalcClient(fake, "m", unit_hint=True).ask([{"role": "user", "content": "할인가는?"}])
+    assert "100을 곱하세요" in fake.calls[0]
+    quiet = FakeEndpoint("계산식: 12000 * 0.85")
+    CalcClient(quiet, "m").ask([{"role": "user", "content": "할인가는?"}])
+    assert "100을 곱하세요" not in quiet.calls[0]
