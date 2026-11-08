@@ -72,3 +72,14 @@ def test_lookup_set_needs_no_calculation_and_names_use_the_exact_scorer(tmp_path
             assert isinstance(r["gold"], str) and r["scorer"] == "exact" and r["reference"] == f"정답: {r['gold']}"
         else:
             assert isinstance(r["gold"], float) and "scorer" not in r
+
+
+def test_units_set_builds_and_golds_follow_the_stated_factor(tmp_path):
+    import random
+    from genesis_calc.build_tasks import UNIT_KINDS, build, make_units
+    manifest = build(tmp_path, per_kind=15, seed=2, kinds_set="units")
+    assert manifest["items"] == 15 * len(UNIT_KINDS) and manifest["set"] == "units"
+    rng = random.Random(3)
+    for kind in UNIT_KINDS:
+        q, gold, tol = make_units(kind, rng)
+        assert isinstance(gold, float) and tol >= 0 and "?" in q
