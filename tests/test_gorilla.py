@@ -176,7 +176,8 @@ def test_retry_prefill_is_opt_in_and_only_on_the_retry():
 def test_ungrounded_accepts_percent_forms_of_question_numbers():
     from genesis.harness.gorilla import ungrounded
     question = "원금 480만원, 연 3% 단리로 4년"
-    assert ungrounded(question, "4800000 * 0.03 * 4") == [4800000.0]  # 480 is present, 4800000 is not
+    assert ungrounded(question, "4800000 * 0.03 * 4") == []  # 480만 = 4800000 is the same figure
+    assert ungrounded(question, "4900000 * 0.03 * 4") == [4900000.0]
     assert ungrounded(question, "480 * 0.03 * 4") == []
     assert ungrounded("정가 200원, 할인율 0.15", "200 * 15 / 100") == []
 
@@ -298,3 +299,11 @@ def test_multistep_formulas_are_joined_and_calculated_once():
     assert ungrounded("원금 1000, 이율 5%", expression_of(reply)) == []
     assert expression_of("계산식: 2 + #3") == "2 + #3"  # a reference to nothing stays and fails the calculation
     assert not finish("계산식: 2 + #3")[1]
+
+
+def test_scaled_units_are_not_made_up_and_missing_parentheses_before_100_is_flagged():
+    from genesis.harness.gorilla import percent_flag, ungrounded
+    assert ungrounded("1,000만원을 2년간", "10000000 * (1 + 0.06)^2") == [0.06]
+    assert ungrounded("2,000억원에서 3,500억원", "3500/2000") == []
+    assert percent_flag("성장률은 몇 %인가?", "(3500/2000)^(1/3)-1*100")
+    assert not percent_flag("성장률은 몇 %인가?", "((3500/2000)^(1/3)-1)*100")
