@@ -58,11 +58,25 @@ def with_instruction(item: dict, text: str = INSTRUCTION) -> dict:
     return clone
 
 
+_REF = re.compile(r"#(\d+)")
+# Optional (CalcClient multistep=True): several ``계산식:`` lines, a later one may use ``#1`` for the first line's value.
+MULTISTEP_HINT = ("\n계산이 여러 단계이면 '계산식: <수식>' 줄을 단계마다 한 줄씩 쓰고, 앞 단계의 결과는 #1, #2처럼 "
+                  "번호로 가져다 쓰세요. 마지막 계산식 줄이 최종 답입니다.")
+
+
+def _resolved(lines: list[str]) -> str:
+    """The last formula with ``#n`` replaced by the n-th formula (in parentheses), so one calculation covers all steps."""
+    done: list[str] = []
+    for line in lines:
+        done.append(_REF.sub(lambda m: f"({done[int(m.group(1)) - 1]})" if 0 < int(m.group(1)) <= len(done) else m.group(0), line))
+    return done[-1]
+
+
 def expression_of(reply: str) -> str | None:
-    """The formula to calculate: the last ``계산식:`` line, else a formula typed on the ``정답:`` line."""
+    """The formula to calculate: the last ``계산식:`` line (steps joined), else a formula typed on the ``정답:`` line."""
     found = _EXPRESSION.findall(reply)
     if found:
-        return found[-1]
+        return _resolved(found)
     typed = [answer for answer in _ANSWER.findall(reply) if _FORMULA.search(answer)]
     return typed[-1] if typed else None
 
@@ -162,8 +176,8 @@ class CalcPipeline:
 
     def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
                  prefill: bool = False, direction_retry: bool = False, unit_hint: bool = False,
-                 exclude_check: bool = False):
-        self.unit_hint, self.exclude_check = unit_hint, exclude_check
+                 exclude_check: bool = False, multistep: bool = False):
+        self.unit_hint, self.exclude_check, self.multistep = unit_hint, exclude_check, multistep
         self.contradicted = self.contradiction_rescued = 0
         self.base, self.digits, self.retry, self.hint, self.prefill = base, digits, retry, hint, prefill
         self.direction_retry = direction_retry
@@ -187,6 +201,7 @@ class CalcPipeline:
 
     def _extra(self) -> str:
         return ((DISTRACTOR_HINT if self.hint else "") + (UNIT_HINT if self.unit_hint else "")
+                + (MULTISTEP_HINT if self.multistep else "")
                 + (EXCLUDE_HINT if self.exclude_check else ""))
 
     def _retry_item(self, item: dict, note: str = "") -> dict:
