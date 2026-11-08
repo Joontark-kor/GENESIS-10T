@@ -58,13 +58,12 @@ class _Generator:
 class CalcClient:
     def __init__(self, client: EndpointClient, model: str, digits: int = 2, retry: bool = True,
                  hint: bool = False, max_tokens: int = 160, template_kwargs: dict | None = None,
-                 prefill: bool = False, unit_hint: bool = False, multistep: bool = False):
+                 prefill: bool = False, unit_hint: bool = False):
         # unit_hint=True tells the model to multiply by 100 when a percent is asked (CAGR gave 0.21 instead of 21)
         # prefill=True needs a server that continues a final assistant message (vLLM, genesis mini_server);
         # Ollama and others ignore it, so it is off by default
         self.pipeline = CalcPipeline(_Generator(client, model, max_tokens, template_kwargs, prefill),
-                                     digits=digits, retry=retry, hint=hint, prefill=prefill, unit_hint=unit_hint,
-                                     multistep=multistep)
+                                     digits=digits, retry=retry, hint=hint, prefill=prefill, unit_hint=unit_hint)
         self.digits = digits
 
     def ask(self, messages: list[dict]) -> CalcResult:
@@ -103,13 +102,11 @@ def main(argv: list[str] | None = None) -> CalcResult:
     p.add_argument("--distractor-hint", action="store_true")
     p.add_argument("--no-retry", action="store_true")
     p.add_argument("--unit-hint", action="store_true", help="ask for percent values as 25, not 0.25")
-    p.add_argument("--multistep", action="store_true", help="allow several 계산식 lines; #1 = the first result")
     p.add_argument("--prefill", action="store_true", help="retry with '계산식:' already written (vLLM, mini_server)")
     p.add_argument("question")
     args = p.parse_args(argv)
     result = CalcClient(EndpointClient(args.url), args.model, retry=not args.no_retry,
-                        hint=args.distractor_hint, prefill=args.prefill, unit_hint=args.unit_hint,
-                        multistep=args.multistep).ask([{"role": "user", "content": args.question}])
+                        hint=args.distractor_hint, prefill=args.prefill, unit_hint=args.unit_hint).ask([{"role": "user", "content": args.question}])
     print(json.dumps(asdict(result), ensure_ascii=False, indent=2))
     return result
 
