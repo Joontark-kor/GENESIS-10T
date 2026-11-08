@@ -96,3 +96,19 @@ def test_external_items_use_choice_and_numeric_scorers(tmp_path):
     assert gsm8k_item({"question": "q", "answer": "x #### 72"}, 0)["gold"] == 72.0
     assert gsm8k_item({"question": "q", "answer": "x"}, 1) is None
     assert write([item], tmp_path)["items"] == 1
+
+
+def test_every_kind_can_make_sixty_distinct_questions_and_a_too_small_kind_raises(tmp_path):
+    import random
+    import pytest
+    from genesis_calc import build_tasks as bt
+    for name, kinds, maker in (("units", bt.UNIT_KINDS, bt.make_units), ("multi", bt.MULTI_KINDS, bt.make_multi),
+                               ("lookup", bt.LOOKUP_KINDS, bt.make_lookup)):
+        assert bt.build(tmp_path / name, per_kind=60, seed=5, kinds_set=name)["items"] == 60 * len(kinds)
+    monkey = bt.make_units
+    bt.make_units = lambda kind, rng: ("항상 같은 질문", 1.0, 0.0)
+    try:
+        with pytest.raises(ValueError):
+            bt.build(tmp_path / "bad", per_kind=3, seed=1, kinds_set="units")
+    finally:
+        bt.make_units = monkey

@@ -155,8 +155,8 @@ def make_multi(kind: str, rng: random.Random) -> tuple[str, float, float]:
 def make_units(kind: str, rng: random.Random) -> tuple[str, float, float]:
     """(question, gold, tolerance) for the unit set: a conversion factor is part of the problem."""
     if kind == "temp_f":
-        c = rng.randint(-10, 38)
-        return (f"섭씨 {c}도는 화씨로 몇 도인가? (화씨 = 섭씨 x 9 / 5 + 32, 소수 둘째 자리)", _round(c * 9 / 5 + 32), 0.01)
+        c = rng.randint(-40, 90) / 2  # 131 distinct values: 60 per kind must not run out of new questions
+        return (f"섭씨 {c:g}도는 화씨로 몇 도인가? (화씨 = 섭씨 x 9 / 5 + 32, 소수 둘째 자리)", _round(c * 9 / 5 + 32), 0.01)
     if kind == "speed_ms":
         v = rng.randint(20, 140)
         return (f"시속 {v}km로 달리는 차의 속도는 초속 몇 미터인가? (1km는 1000m, 1시간은 3600초, 소수 둘째 자리)",
@@ -180,9 +180,12 @@ def build(out: Path, per_kind: int, seed: int, kinds_set: str = "basic") -> dict
     rng = random.Random(seed)
     items, seen = [], set()
     for kind in kinds:
-        n = 0
+        n, tries = 0, 0
         while n < per_kind:
             q, gold, tol = maker(kind, rng)
+            tries += 1
+            if tries > per_kind * 200:  # the kind has fewer distinct questions than asked for: stop instead of spinning
+                raise ValueError(f"kind {kind!r} cannot make {per_kind} distinct questions")
             if q in seen:
                 continue
             seen.add(q)
