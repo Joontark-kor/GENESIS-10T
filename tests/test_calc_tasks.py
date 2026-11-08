@@ -58,3 +58,17 @@ def test_multi_set_golds_need_an_intermediate_value(tmp_path):
         for _ in range(20):
             _, gold, tol = make_multi(kind, rng)
             assert 0 < gold < 1e6 and abs(parse_number(f"정답: {gold:g}") - gold) <= tol
+
+
+def test_lookup_set_needs_no_calculation_and_names_use_the_exact_scorer(tmp_path):
+    import json
+    from genesis_calc.build_tasks import LOOKUP_KINDS
+    manifest = build(tmp_path, per_kind=15, seed=2, kinds_set="lookup")
+    assert manifest["items"] == 15 * len(LOOKUP_KINDS) and manifest["set"] == "lookup"
+    rows = [json.loads(x) for x in (tmp_path / "eval_test.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert len({r["messages"][1]["content"] for r in rows}) == len(rows)
+    for r in rows:
+        if r["kind"] in ("pick_max", "pick_min"):
+            assert isinstance(r["gold"], str) and r["scorer"] == "exact" and r["reference"] == f"정답: {r['gold']}"
+        else:
+            assert isinstance(r["gold"], float) and "scorer" not in r

@@ -25,6 +25,7 @@ SYSTEM = ("당신은 일상 수치 문제를 정확히 계산하는 보조입니
 KINDS = ("percent_change", "discount", "tax_inclusive", "average", "simple_interest", "speed_time", "unit_convert")
 
 
+LOOKUP_KINDS = ("table_value", "pick_max", "pick_min", "count_over")
 MULTI_KINDS = ("discount_tax_split", "loan_monthly", "net_profit", "trip_time")
 HARD_KINDS = ("compound_interest", "cagr", "bmi", "electric_power", "fuel_cost", "molarity")
 
@@ -102,6 +103,29 @@ def make_hard(kind: str, rng: random.Random) -> tuple[str, float, float]:
     raise ValueError(kind)
 
 
+_NAMES = ("서울", "부산", "대구", "인천", "광주", "대전", "울산", "수원")
+
+
+def make_lookup(kind: str, rng: random.Random) -> tuple[str, float | str, float]:
+    """(question, gold, tolerance) for the guard set: nothing to calculate, only reading a table or counting.
+
+    The gorilla pipeline must not turn these into formulas. Name answers use the exact scorer."""
+    names = rng.sample(_NAMES, 5)
+    values = rng.sample(range(100, 1000), 5)
+    table = ", ".join(f"{n} {v}명" for n, v in zip(names, values))
+    if kind == "table_value":
+        i = rng.randrange(5)
+        return f"방문자 수는 {table}이다. {names[i]}의 방문자 수는 몇 명인가?", float(values[i]), 0.0
+    if kind == "pick_max":
+        return f"방문자 수는 {table}이다. 방문자가 가장 많은 곳의 이름을 답하라.", names[values.index(max(values))], 0.0
+    if kind == "pick_min":
+        return f"방문자 수는 {table}이다. 방문자가 가장 적은 곳의 이름을 답하라.", names[values.index(min(values))], 0.0
+    if kind == "count_over":
+        t = rng.choice([300, 400, 500, 600, 700])
+        return f"방문자 수는 {table}이다. 방문자가 {t}명을 넘은 곳은 몇 곳인가?", float(sum(v > t for v in values)), 0.0
+    raise ValueError(kind)
+
+
 def make_multi(kind: str, rng: random.Random) -> tuple[str, float, float]:
     """(question, gold, tolerance) for the multi-step set: the answer needs an intermediate value first."""
     if kind == "discount_tax_split":
@@ -128,7 +152,8 @@ def make_multi(kind: str, rng: random.Random) -> tuple[str, float, float]:
 
 
 def build(out: Path, per_kind: int, seed: int, kinds_set: str = "basic") -> dict:
-    kinds, maker = {"hard": (HARD_KINDS, make_hard), "multi": (MULTI_KINDS, make_multi)}.get(kinds_set, (KINDS, make))
+    kinds, maker = {"hard": (HARD_KINDS, make_hard), "multi": (MULTI_KINDS, make_multi),
+                    "lookup": (LOOKUP_KINDS, make_lookup)}.get(kinds_set, (KINDS, make))
     out.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
     items, seen = [], set()
@@ -139,9 +164,13 @@ def build(out: Path, per_kind: int, seed: int, kinds_set: str = "basic") -> dict
             if q in seen:
                 continue
             seen.add(q)
-            items.append({"id": f"calc-{kind}-{n}", "kind": kind, "lang": "ko",
-                          "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": q}],
-                          "gold": gold, "unit": "", "tolerance": tol, "reference": f"정답: {gold:g}"})
+            item = {"id": f"calc-{kind}-{n}", "kind": kind, "lang": "ko",
+                    "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": q}],
+                    "gold": gold, "unit": "", "tolerance": tol,
+                    "reference": f"정답: {gold}" if isinstance(gold, str) else f"정답: {gold:g}"}
+            if isinstance(gold, str):
+                item["scorer"] = "exact"
+            items.append(item)
             n += 1
     path = out / "eval_test.jsonl"
     path.write_text("".join(json.dumps(i, ensure_ascii=False) + "\n" for i in items), encoding="utf-8")
@@ -156,7 +185,7 @@ def main() -> None:
     p.add_argument("--out", type=Path, default=Path("data/applied/calc_v1"))
     p.add_argument("--per-kind", type=int, default=60)
     p.add_argument("--seed", type=int, default=1)
-    p.add_argument("--set", dest="kinds_set", choices=("basic", "hard", "multi"), default="basic")
+    p.add_argument("--set", dest="kinds_set", choices=("basic", "hard", "multi", "lookup"), default="basic")
     args = p.parse_args()
     print(json.dumps(build(args.out, args.per_kind, args.seed, args.kinds_set), ensure_ascii=False, indent=2))
 
