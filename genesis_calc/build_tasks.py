@@ -2,7 +2,7 @@
 
     python -m genesis_calc.build_tasks --out data/applied/calc_v1 --per-kind 60 --seed 1
 
-Purpose: test whether the gorilla pipeline (model writes the formula, a calculator computes)
+Purpose: test whether the polarbear pipeline (model writes the formula, a calculator computes)
 helps outside finance. Every answer is computed from the numbers in the question; each
 question also carries one or two distractor numbers the formula must not use.
 Eval only (no training split): a second-domain check, not a second adapter.

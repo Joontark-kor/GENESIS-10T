@@ -1,4 +1,4 @@
-# Gorilla — 모델은 식을 쓰고, 계산은 계산기가 한다
+# Polarbear — 모델은 식을 쓰고, 계산은 계산기가 한다
 
 ## 왜 만들었나
 
@@ -14,7 +14,7 @@ fin-v1 첫 QLoRA(2026-11-05): 전체 정확도 85.3% → 84.0%, 개선 없음. �
 
 - `genesis/tools.py`: 사칙연산·거듭제곱만 허용하는 안전한 계산기(이름·함수 호출·속성 불가, 지수 12 제한).
   천 단위 쉼표, `× ÷ −`, 끝의 `= 결과`는 정리해서 받는다.
-- `genesis/harness/gorilla.py`: 평가 문항 끝에 지시를 붙이고, 모델이 쓴 `계산식:`을 계산해 `정답: 값`을 붙인다.
+- `genesis/harness/polarbear.py`: 평가 문항 끝에 지시를 붙이고, 모델이 쓴 `계산식:`을 계산해 `정답: 값`을 붙인다.
   식이 없거나 계산할 수 없으면 원래 답을 그대로 둔다(실패는 점수에 그대로 드러난다).
 - 도메인을 모른다. 금융이든 다른 분야든 같은 부품을 쓴다.
 
@@ -22,9 +22,9 @@ fin-v1 첫 QLoRA(2026-11-05): 전체 정확도 85.3% → 84.0%, 개선 없음. �
 
 ```bash
 python -m genesis.harness.evaluate run --model Qwen/Qwen3-4B --template-kwargs '{"enable_thinking": false}' \
-    --data data/applied/fin_v1/eval_test.jsonl --name base-gorilla --pipeline gorilla \
-    --batch-size 16 --max-new-tokens 128 --out reports/applied/base-gorilla.json
-python -m genesis.harness.evaluate compare reports/applied/base.json reports/applied/base-gorilla.json
+    --data data/applied/fin_v1/eval_test.jsonl --name base-polarbear --pipeline polarbear \
+    --batch-size 16 --max-new-tokens 128 --out reports/applied/base-polarbear.json
+python -m genesis.harness.evaluate compare reports/applied/base.json reports/applied/base-polarbear.json
 ```
 
 보고서의 `settings.pipeline`, `pipeline_fallbacks`(식을 못 뽑은 횟수)가 같이 기록된다.
@@ -55,7 +55,7 @@ python -m genesis.harness.evaluate compare reports/applied/base.json reports/app
 
 ## 검산 1단계 (이 브랜치, 측정 전)
 
-식에 쓴 숫자가 질문 원문에 실제로 있는지만 본다(`gorilla.ungrounded`). 1과 100은 구조 상수로 제외.
+식에 쓴 숫자가 질문 원문에 실제로 있는지만 본다(`polarbear.ungrounded`). 1과 100은 구조 상수로 제외.
 보고서 `settings.pipeline_ungrounded`에 횟수만 기록하고 답은 바꾸지 않는다.
 잡을 수 있는 것: 지어낸 숫자·잘못 옮긴 숫자(2차의 ROE 오답 `10682.6`). 못 잡는 것: 표에서 엉뚱한 연도·항목의 값을 집은 경우(추출 5건) —
 이 유형은 원문 속 값이라 통과한다. 측정으로 효과가 작다고 나오면 2단계(항목명·연도 대조)를 설계한다.
@@ -68,17 +68,17 @@ python -m genesis.harness.evaluate compare reports/applied/base.json reports/app
 python -m genesis_calc.build_tasks --out data/applied/calc_v1 --per-kind 60 --seed 1
 python -m genesis.harness.evaluate run --model Qwen/Qwen3-4B --template-kwargs '{"enable_thinking": false}' \
     --data data/applied/calc_v1/eval_test.jsonl --name calc-base --batch-size 16 --max-new-tokens 128 --out reports/applied/calc-base.json
-python -m genesis.harness.evaluate run ... --name calc-gorilla --pipeline gorilla --out reports/applied/calc-gorilla.json
-python -m genesis.harness.evaluate compare reports/applied/calc-base.json reports/applied/calc-gorilla.json
+python -m genesis.harness.evaluate run ... --name calc-polarbear --pipeline polarbear --out reports/applied/calc-polarbear.json
+python -m genesis.harness.evaluate compare reports/applied/calc-base.json reports/applied/calc-polarbear.json
 ```
 
-기대: 기본 모델이 산술에서 틀리는 만큼 고릴라가 올린다. 기대와 다르면(이미 높거나 안 오르면) 그것이 코어에 대해 새로 배우는 것이다.
+기대: 기본 모델이 산술에서 틀리는 만큼 폴라베어가 올린다. 기대와 다르면(이미 높거나 안 오르면) 그것이 코어에 대해 새로 배우는 것이다.
 
 ### 첫 측정(v0)에서 나온 것 — 2026-11-06
 
-일상 수치 평가셋 첫 판(420문항, 기본 Qwen3-4B): 기준선 65.5% → 고릴라 75.7%. 종류별로는 엇갈렸다.
-- **고릴라가 크게 도운 것**: 증감률 68→100, 속도 3→100, 평균 92→100.
-- **고릴라가 해친 것**: 단리 이자 92→15. 원인은 **계산기 버그**: 모델이 `원금 * 3% * 4`처럼 %를 썼는데 `clean()`이 %를 그냥 지워 3으로 계산했다(100배). 이제 식 안의 `N%`는 `N/100`으로 읽는다(끝의 `*100%`는 비율의 ×100이라 그대로 둔다).
+일상 수치 평가셋 첫 판(420문항, 기본 Qwen3-4B): 기준선 65.5% → 폴라베어 75.7%. 종류별로는 엇갈렸다.
+- **폴라베어가 크게 도운 것**: 증감률 68→100, 속도 3→100, 평균 92→100.
+- **폴라베어가 해친 것**: 단리 이자 92→15. 원인은 **계산기 버그**: 모델이 `원금 * 3% * 4`처럼 %를 썼는데 `clean()`이 %를 그냥 지워 3으로 계산했다(100배). 이제 식 안의 `N%`는 `N/100`으로 읽는다(끝의 `*100%`는 비율의 ×100이라 그대로 둔다).
 - **평가셋 결함**: 부가세의 "수량은 N개", 속도의 "N분 쉬었지만 제외한다"는 모델이 계산에 쓰는 게 자연스러운 문장이라 기준선이 3%로 나왔다(모호한 문제). 방해 숫자를 계산과 무관한 것(사업자 번호, 출발 시각)으로 바꿔 다시 잰다.
 - **새로 알게 된 것**: "계산이 필요 없으면 `정답: 값`을 바로 쓰라"는 탈출구를 모델이 쉬운 계산(할인)에도 써서 60문항 중 6개를 틀렸다(식을 쓴 문제는 전부 맞음). 탈출구는 금융 추출에서는 이득이었지만 일반 분야에서는 오류 통로가 된다. 다음에 지시문을 더 좁힐지 본다.
 
@@ -86,7 +86,7 @@ python -m genesis.harness.evaluate compare reports/applied/calc-base.json report
 
 일상 수치 420문항, 기본 Qwen3-4B, Colab T4.
 
-| 종류 | 기준선 | 고릴라 |
+| 종류 | 기준선 | 폴라베어 |
 |---|---|---|
 | **전체** | 92.9% | **98.6%** |
 | 증감률 | 68.3% | 100% |
@@ -110,13 +110,13 @@ python -m genesis.harness.evaluate compare reports/applied/calc-base.json report
 
 기본 모델 Qwen3-4B, Colab T4, 설정마다 1회 측정(몇 문항 차이는 잡음). 옵션은 모두 기본 꺼짐.
 
-| 세트 | 기준선 | 고릴라(기본) | +힌트·prefill | +제외 검사 | +제외 검사·단위 힌트 |
+| 세트 | 기준선 | 폴라베어(기본) | +힌트·prefill | +제외 검사 | +제외 검사·단위 힌트 |
 |---|---|---|---|---|---|
 | 금융 544 | 85.3% | 98.9% | 98.7% | **75.9% (퇴보)** | — |
 | 일상 수치 420 | 92.9% | 97.9% | 99.8% | 99.8% | — |
 | 어려운 세트 360 (복리·CAGR·BMI·전력·연료비·몰농도) | 49.2% | — | 66.9% | 77.8% | 83.1% |
 
-- 고릴라(모델은 식, 계산은 계산기)는 세 세트 모두에서 기준선보다 낫다. 이득은 모델이 직접 계산에서 틀리는 만큼 커진다(어려운 세트 +17.7%p).
+- 폴라베어(모델은 식, 계산은 계산기)는 세 세트 모두에서 기준선보다 낫다. 이득은 모델이 직접 계산에서 틀리는 만큼 커진다(어려운 세트 +17.7%p).
 - 각 옵션은 **그 옵션이 겨냥한 실패가 있는 과제에만** 쓴다.
   - `--distractor-hint --retry-prefill`: 방해 숫자가 있고 모델이 식 없이 암산으로 답하는 과제. 금융에서는 이득도 퇴보도 없음.
   - `--exclude-check`: 방해 숫자가 실제로 있는 과제 전용. 방해 숫자가 없는 금융에서는 필요한 숫자를 '제외'로 적고 재시도가 그것을 빼서 식이 망가진다.
@@ -134,17 +134,17 @@ python -m genesis.harness.evaluate compare reports/applied/calc-base.json report
 | 구성 | 전체 | 할인+세금+나눔 | 월 상환액 | 순이익 | 이동 시간 |
 |---|---|---|---|---|---|
 | 기준선 | 78.3% | 48.3% | 70.0% | 100% | 95.0% |
-| 고릴라(기본) | **92.1%** | 100% | 90.0% | 95.0% | 83.3% |
-| 고릴라 + `--multistep` | 64.2% | 71.7% | 18.3% | 100% | 66.7% |
+| 폴라베어(기본) | **92.1%** | 100% | 90.0% | 95.0% | 83.3% |
+| 폴라베어 + `--multistep` | 64.2% | 71.7% | 18.3% | 100% | 66.7% |
 
-- 고릴라 기본이 +13.8%p. 모델은 중간값을 따로 계산식 줄로 쓰지 않아도 **한 식에 중첩**해서 푼다.
+- 폴라베어 기본이 +13.8%p. 모델은 중간값을 따로 계산식 줄로 쓰지 않아도 **한 식에 중첩**해서 푼다.
 - `--multistep`(계산식 여러 줄, `#1` 참조)은 이 모델에서 **오히려 퇴보**했다(월 상환액 90→18%). 줄을 나누게 하면 마지막 줄에 첫 단계만 쓰는 식으로 식이 잘린다. 기본 꺼짐 유지, 이 모델에는 권하지 않는다.
 - 첫 측정(문장 수정 전)에서 `discount_tax_split`이 0%였다. 문장이 "할인된 금액"이라 모델이 할인액으로 읽었다. 문장을 고치자 0→100%. 평가 문장이 모호하면 점수가 왜곡된다(복리 때와 같은 교훈).
 - 월 상환액의 남은 오답: 산문에서는 34.71로 맞게 풀고도 계산식 줄에는 첫 단계만 적는다(식 누락). 도메인 중립으로 잡을 신호가 아직 없다.
 
 #### 식 누락 신호 `prose_mismatch` (CalcClient 경고, 2026-11-08)
 
-계산식 앞 설명 글의 마지막 수치(질문에 없던 것)가 계산기 결과와 다르면 "식에 단계가 빠졌을 수 있다"고 경고한다. 재시도는 하지 않는다. 다단계 세트 고릴라 결과(240문항) 기준:
+계산식 앞 설명 글의 마지막 수치(질문에 없던 것)가 계산기 결과와 다르면 "식에 단계가 빠졌을 수 있다"고 경고한다. 재시도는 하지 않는다. 다단계 세트 폴라베어 결과(240문항) 기준:
 
 | | 경고함 | 경고 안 함 |
 |---|---|---|
@@ -155,5 +155,5 @@ python -m genesis.harness.evaluate compare reports/applied/calc-base.json report
 - 오경보는 설명이 중간 값에서 끝나고 식은 최종까지 맞게 쓴 경우(순이익·이동 시간).
 - 결론: 앱이 "확인하라"는 표시로만 쓸 수 있는 약한 신호이고, 자동 재시도 조건으로 쓰기에는 정밀도가 낮다. 더 나은 신호가 나오기 전까지 경고로만 둔다.
 
-**`--prose-retry` 측정 (다단계 240문항, 1회):** 고릴라 92.1% → 90.4%. 경고 38건, 교체 9건. 월 상환액 90.0→93.3%(+2문항)이지만 이동 시간 83.3→73.3%(−6문항). 설명이 중간 값에서 끝난 정상 답까지 재시도해 바뀐 것으로 보인다. 순이득이 없어 기본 꺼짐 유지, 권하지 않는다. 식 누락은 경고(`prose_mismatch`)로만 쓴다.
+**`--prose-retry` 측정 (다단계 240문항, 1회):** 폴라베어 92.1% → 90.4%. 경고 38건, 교체 9건. 월 상환액 90.0→93.3%(+2문항)이지만 이동 시간 83.3→73.3%(−6문항). 설명이 중간 값에서 끝난 정상 답까지 재시도해 바뀐 것으로 보인다. 순이득이 없어 기본 꺼짐 유지, 권하지 않는다. 식 누락은 경고(`prose_mismatch`)로만 쓴다.
 
