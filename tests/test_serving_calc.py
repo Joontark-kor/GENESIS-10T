@@ -43,3 +43,33 @@ def test_warns_about_numbers_the_question_never_gave():
 def test_warns_about_a_reversed_growth_formula():
     result, _ = ask("계산식: (7240 - 3320) / 7240 * 100", question="3,320에서 7,240으로. 증감률은?")
     assert any("방향" in w for w in result.warnings)
+
+
+class PrefillEndpoint:
+    """Answers in its head unless the final assistant message is already started (like vLLM's continue_final_message)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def chat(self, model, messages, max_tokens=256, temperature=0.0, template_kwargs=None, **extra):
+        self.calls.append((messages, extra))
+        text = "12000 * (1 - 15%)" if extra.get("continue_final_message") else "정답: 10180"
+        return Reply(text=text, completion_tokens=5, prompt_tokens=1, finish_reason="stop")
+
+
+def test_prefill_retry_forces_a_formula_and_marks_the_request():
+    fake = PrefillEndpoint()
+    result = CalcClient(fake, "m", prefill=True).ask([{"role": "user", "content": "정가 12,000원, 15% 할인가는?"}])
+    assert result.retried and result.answer == "10200" and result.formula == "12000 * (1 - 15%)"
+    messages, extra = fake.calls[1]
+    assert messages[-1] == {"role": "assistant", "content": "계산식: "}
+    assert extra == {"continue_final_message": True, "add_generation_prompt": False}
+    assert "continue_final_message" not in fake.calls[0][1]  # the first pass is a normal request
+
+
+def test_prefill_is_off_by_default_and_a_non_numeric_answer_gets_no_warning():
+    fake = PrefillEndpoint()
+    result = CalcClient(fake, "m").ask([{"role": "user", "content": "정가 12,000원, 15% 할인가는?"}])
+    assert not result.used_calculator and all("continue_final_message" not in e for _, e in fake.calls)
+    quiet, _ = ask("정답: 서울", question="대한민국의 수도는 어디인가?")
+    assert quiet.warnings == []

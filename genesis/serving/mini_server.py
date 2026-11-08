@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
 
 # generate(messages, max_tokens, temperature, template_kwargs) -> (text, prompt_tokens, completion_tokens)
-Generate = Callable[[list, int, float, dict], tuple[str, int, int]]
+Generate = Callable[[list, int, float, dict], tuple[str, int, int]]  # template kwargs may hold continue_final_message
 
 
 def make_handler(model_name: str, generate: Generate):
@@ -44,7 +44,8 @@ def make_handler(model_name: str, generate: Generate):
                 return self._send(400, {"error": "expected JSON with messages"})
             text, prompt_tokens, completion_tokens = generate(
                 messages, int(payload.get("max_tokens", 256)), float(payload.get("temperature", 0.0)),
-                payload.get("chat_template_kwargs") or {})
+                {**(payload.get("chat_template_kwargs") or {}),
+                 **{k: payload[k] for k in ("continue_final_message", "add_generation_prompt") if k in payload}})
             self._send(200, {
                 "id": f"chatcmpl-{int(time.time() * 1000)}", "object": "chat.completion", "model": model_name,
                 "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
@@ -67,7 +68,8 @@ def transformers_generate(model_id: str) -> Generate:
                                                  device_map="auto" if torch.cuda.is_available() else None)
 
     def generate(messages, max_tokens, temperature, template_kwargs):
-        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, **template_kwargs)
+        template_kwargs = {"add_generation_prompt": True, **template_kwargs}
+        prompt = tokenizer.apply_chat_template(messages, tokenize=False, **template_kwargs)
         encoded = tokenizer(prompt, return_tensors="pt").to(model.device)
         options = {"do_sample": True, "temperature": temperature} if temperature > 0 else {"do_sample": False}
         with torch.no_grad():
