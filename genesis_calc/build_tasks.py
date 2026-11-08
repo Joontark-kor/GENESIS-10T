@@ -25,6 +25,7 @@ SYSTEM = ("당신은 일상 수치 문제를 정확히 계산하는 보조입니
 KINDS = ("percent_change", "discount", "tax_inclusive", "average", "simple_interest", "speed_time", "unit_convert")
 
 
+MULTI_KINDS = ("discount_tax_split", "loan_monthly", "net_profit", "trip_time")
 HARD_KINDS = ("compound_interest", "cagr", "bmi", "electric_power", "fuel_cost", "molarity")
 
 
@@ -101,8 +102,33 @@ def make_hard(kind: str, rng: random.Random) -> tuple[str, float, float]:
     raise ValueError(kind)
 
 
+def make_multi(kind: str, rng: random.Random) -> tuple[str, float, float]:
+    """(question, gold, tolerance) for the multi-step set: the answer needs an intermediate value first."""
+    if kind == "discount_tax_split":
+        price, d, t, n = rng.randint(20, 200) * 1000, rng.choice([10, 15, 20, 25, 30]), rng.choice([5, 8, 10]), rng.randint(2, 6)
+        q = (f"정가 {price:,}원짜리를 {d}% 할인받고, 할인된 금액에 부가세 {t}%가 붙는다. 이를 {n}명이 똑같이 나눠 내면 "
+             f"1인당 얼마인가? (원 단위, 소수 둘째 자리)")
+        return q, _round(price * (1 - d / 100) * (1 + t / 100) / n), 0.5
+    if kind == "loan_monthly":
+        p, r, y = rng.randint(5, 50) * 100, rng.choice([3, 4, 5, 6, 7]), rng.randint(2, 10)
+        q = (f"{p:,}만원을 연 {r}% 단리로 {y}년 빌렸다. 만기에 원금과 이자를 합쳐 갚되 "
+             f"{y * 12}개월로 똑같이 나눠 낸다면 매달 몇 만원인가? (소수 둘째 자리)")
+        return q, _round(p * (1 + r / 100 * y) / (y * 12)), 0.01
+    if kind == "net_profit":
+        rev, c, t = rng.randint(10, 90) * 100, rng.choice([40, 50, 60, 65, 70]), rng.choice([10, 15, 20, 22])
+        q = (f"매출 {rev:,}만원에서 원가가 매출의 {c}%이다. 남은 이익에 세율 {t}%를 적용해 세금을 낸다. "
+             f"세후 순이익은 몇 만원인가? (소수 둘째 자리)")
+        return q, _round(rev * (1 - c / 100) * (1 - t / 100)), 0.01
+    if kind == "trip_time":
+        d1, v1, d2, v2 = rng.randint(30, 150), rng.choice([60, 80, 90, 100]), rng.randint(20, 90), rng.choice([30, 40, 50, 70])
+        q = (f"{d1}km를 시속 {v1}km로 간 뒤, 이어서 {d2}km를 시속 {v2}km로 갔다. "
+             f"전체 걸린 시간은 몇 분인가? (소수 둘째 자리)")
+        return q, _round((d1 / v1 + d2 / v2) * 60), 0.05
+    raise ValueError(kind)
+
+
 def build(out: Path, per_kind: int, seed: int, kinds_set: str = "basic") -> dict:
-    kinds, maker = (HARD_KINDS, make_hard) if kinds_set == "hard" else (KINDS, make)
+    kinds, maker = {"hard": (HARD_KINDS, make_hard), "multi": (MULTI_KINDS, make_multi)}.get(kinds_set, (KINDS, make))
     out.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
     items, seen = [], set()
@@ -130,7 +156,7 @@ def main() -> None:
     p.add_argument("--out", type=Path, default=Path("data/applied/calc_v1"))
     p.add_argument("--per-kind", type=int, default=60)
     p.add_argument("--seed", type=int, default=1)
-    p.add_argument("--set", dest="kinds_set", choices=("basic", "hard"), default="basic")
+    p.add_argument("--set", dest="kinds_set", choices=("basic", "hard", "multi"), default="basic")
     args = p.parse_args()
     print(json.dumps(build(args.out, args.per_kind, args.seed, args.kinds_set), ensure_ascii=False, indent=2))
 

@@ -44,3 +44,17 @@ def test_caret_is_read_as_a_power_not_rejected():
     assert calculate("2200 * (1 + 0.045)^2 - 3") == __import__("pytest").approx(2399.455, abs=0.01)
     assert calculate("(5829/3100)^(1/2)-1") == __import__("pytest").approx(0.3713, abs=1e-3)
     assert calculate("2^3") == 8
+
+
+def test_multi_set_golds_need_an_intermediate_value(tmp_path):
+    import json
+    from genesis_calc.build_tasks import MULTI_KINDS, make_multi
+    manifest = build(tmp_path, per_kind=15, seed=2, kinds_set="multi")
+    assert manifest["items"] == 15 * len(MULTI_KINDS) and manifest["set"] == "multi"
+    rows = [json.loads(x) for x in (tmp_path / "eval_test.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert len({r["messages"][1]["content"] for r in rows}) == len(rows)
+    rng = random.Random(0)
+    for kind in MULTI_KINDS:
+        for _ in range(20):
+            _, gold, tol = make_multi(kind, rng)
+            assert 0 < gold < 1e6 and abs(parse_number(f"정답: {gold:g}") - gold) <= tol
