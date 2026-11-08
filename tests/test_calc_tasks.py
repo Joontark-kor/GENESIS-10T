@@ -83,3 +83,16 @@ def test_units_set_builds_and_golds_follow_the_stated_factor(tmp_path):
     for kind in UNIT_KINDS:
         q, gold, tol = make_units(kind, rng)
         assert isinstance(gold, float) and tol >= 0 and "?" in q
+
+
+def test_external_items_use_choice_and_numeric_scorers(tmp_path):
+    from genesis.harness.scorers import choice
+    from genesis_calc.external import gsm8k_gold, gsm8k_item, kmmlu_item, write
+    row = {"question": "자본의 정의는?", "A": "a1", "B": "b1", "C": "c1", "D": "d1", "answer": 3}
+    item = kmmlu_item(row, "Accounting", 0)
+    assert item["gold"] == "C" and item["scorer"] == "choice" and "D. d1" in item["messages"][1]["content"]
+    assert choice("설명...\n정답: C", item)[1] and choice("정답: c.", item)[1] and not choice("정답: B", item)[1]
+    assert gsm8k_gold("풀이 <<1+1=2>> #### 1,072") == 1072.0 and gsm8k_gold("no marker") is None
+    assert gsm8k_item({"question": "q", "answer": "x #### 72"}, 0)["gold"] == 72.0
+    assert gsm8k_item({"question": "q", "answer": "x"}, 1) is None
+    assert write([item], tmp_path)["items"] == 1

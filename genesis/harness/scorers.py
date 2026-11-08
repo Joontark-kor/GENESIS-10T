@@ -55,7 +55,19 @@ def exact(reply: str, item: dict) -> tuple[str, bool]:
     return answer, _normalize(answer) == _normalize(item["gold"])
 
 
-BUILTIN: dict[str, Scorer] = {"numeric": numeric, "exact": exact}
+_CHOICE = re.compile(r"[ABCD]")
+
+
+def choice(reply: str, item: dict) -> tuple[str, bool]:
+    """Multiple choice: the first A-D letter after the answer tag (else the first in the reply) must equal ``gold``."""
+    tagged = _TAGGED.findall(reply)
+    source = (tagged[-1] if tagged else reply).strip().upper()
+    letters = _CHOICE.findall(source)
+    answer = letters[0] if letters else ""
+    return answer, answer == str(item["gold"]).strip().upper()
+
+
+BUILTIN: dict[str, Scorer] = {"numeric": numeric, "exact": exact, "choice": choice}
 
 
 def resolve(name: str) -> Scorer:
