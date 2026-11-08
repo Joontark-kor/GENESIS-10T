@@ -29,7 +29,7 @@ python -m genesis.serving.endpoint vllm --base Qwen/Qwen3-4B --adapter fin=runs/
 python -m genesis.serving.endpoint models --url http://localhost:8000/v1
 ```
 
-`genesis/serving/endpoint.py`는 표준 라이브러리만 쓰므로 앱이 이 파일 하나만 복사해 써도 된다. 로컬 시험은 Ollama(`http://localhost:11434/v1`)로 같은 API를 쓸 수 있다.
+`genesis/serving/endpoint.py`는 표준 라이브러리만 쓰므로 앱이 이 파일 하나만 복사해 써도 된다. 로컬 시험은 Ollama(`http://localhost:11434/v1`)로 같은 API를 쓸 수 있다. vLLM·Ollama가 없는 기계(Colab T4 등)에서는 `python -m genesis.serving.mini_server --model Qwen/Qwen3-4B`가 같은 API를 transformers로 띄운다(시험용, 한 번에 한 요청).
 
 ## 규약 2: 평가 보고서 형식이 표준이다
 
