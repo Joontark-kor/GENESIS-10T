@@ -209,8 +209,9 @@ class CalcPipeline:
     def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
                  prefill: bool = False, direction_retry: bool = False, unit_hint: bool = False,
                  exclude_check: bool = False, multistep: bool = False, prose_retry: bool = False,
-                 lookup_hint: bool = False):
+                 lookup_hint: bool = False, route: bool = False):
         self.lookup_hint = lookup_hint
+        self.route, self.routed_plain, self.routed_polar = route, 0, 0
         self.unit_hint, self.exclude_check, self.multistep = unit_hint, exclude_check, multistep
         self.prose_retry, self.prose_flagged, self.prose_rescued = prose_retry, 0, 0
         self.contradicted = self.contradiction_rescued = 0
@@ -255,6 +256,23 @@ class CalcPipeline:
         return clone
 
     def generate(self, batch: list[dict]) -> list[tuple[str, int]]:
+        """With ``route``: answer plainly first and keep that answer when it only read a value off the question
+        (a name, a table value); everything else is solved by the formula pipeline. The polarbear instruction
+        made such replies terse on a set with nothing to calculate (85.8% -> 81.2%)."""
+        if not self.route:
+            return self._generate(batch)
+        plain = self.base.generate(batch)
+        keep = [looked_up(question_text(item), text) for item, (text, _) in zip(batch, plain)]
+        todo = [i for i, k in enumerate(keep) if not k]
+        solved = self._generate([batch[i] for i in todo]) if todo else []
+        self.routed_plain += len(batch) - len(todo)
+        self.routed_polar += len(todo)
+        out = list(plain)
+        for i, (text, n_tokens) in zip(todo, solved):
+            out[i] = (text, n_tokens + plain[i][1])  # the first plain pass costs tokens too
+        return out
+
+    def _generate(self, batch: list[dict]) -> list[tuple[str, int]]:
         outputs = self.base.generate([with_instruction(item, INSTRUCTION + self._extra()) for item in batch])
         results: list[list] = []  # [final text, tokens, used the calculator]
         again: list[int] = []

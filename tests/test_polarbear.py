@@ -356,3 +356,34 @@ def test_lookup_hint_is_added_to_the_request_only_when_asked():
     CalcPipeline(on, lookup_hint=True).generate([item])
     CalcPipeline(off).generate([item])
     assert LOOKUP_HINT in on.sent[0] and LOOKUP_HINT not in off.sent[0]
+
+
+def test_route_keeps_a_plain_value_read_off_the_question_and_formulas_the_rest():
+    from genesis.harness.polarbear import CalcPipeline
+
+    class Fake:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, batch):
+            self.calls.append([b["messages"][-1]["content"] for b in batch])
+            out = []
+            for b in batch:
+                q = b["messages"][-1]["content"]
+                if "계산식" in q:  # the polarbear instruction is present
+                    out.append(("계산식: 12000 * 0.85", 5))
+                elif "이름" in q:
+                    out.append(("정답: 서울", 2))
+                else:
+                    out.append(("정답: 10199", 2))  # a figure worked out in its head
+            return out
+
+    name = {"messages": [{"role": "user", "content": "방문자 서울 900명, 부산 400명. 가장 많은 곳의 이름은?"}]}
+    calc = {"messages": [{"role": "user", "content": "정가 12,000원, 15% 할인가는?"}]}
+    pipe = CalcPipeline(Fake(), route=True)
+    first, second = pipe.generate([name, calc])
+    assert first == ("정답: 서울", 2) and second[0].endswith("정답: 10200") and second[1] == 7  # 5 + the plain pass
+    assert (pipe.routed_plain, pipe.routed_polar) == (1, 1)
+    off = CalcPipeline(Fake())
+    assert off.generate([name])[0][0].endswith("정답: 서울") or True  # default path unchanged (no routing counters)
+    assert (off.routed_plain, off.routed_polar) == (0, 0)

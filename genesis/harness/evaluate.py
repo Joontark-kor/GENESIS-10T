@@ -160,7 +160,7 @@ def run(args) -> dict:
                                 hint=args.distractor_hint, prefill=args.retry_prefill,
                                 direction_retry=args.direction_retry, unit_hint=args.unit_hint,
                                 exclude_check=args.exclude_check, multistep=args.multistep, prose_retry=args.prose_retry,
-                                lookup_hint=args.lookup_hint)
+                                lookup_hint=args.lookup_hint, route=args.route)
     default_scorer = args.scorer
     rows, generated_tokens = [], 0
     generator.sync()
@@ -209,6 +209,9 @@ def run(args) -> dict:
                      "pipeline_unit_hint": getattr(generator, "unit_hint", None),
                      "pipeline_multistep": getattr(generator, "multistep", None),
                      "pipeline_lookup_hint": getattr(generator, "lookup_hint", None),
+                     "pipeline_route": getattr(generator, "route", None),
+                     "pipeline_routed_plain": getattr(generator, "routed_plain", None),
+                     "pipeline_routed_polar": getattr(generator, "routed_polar", None),
                      "pipeline_prose_retry": getattr(generator, "prose_retry", None),
                      "pipeline_prose_flagged": getattr(generator, "prose_flagged", None),
                      "pipeline_prose_rescued": getattr(generator, "prose_rescued", None),
@@ -279,6 +282,8 @@ def main(argv: list[str] | None = None):
                    help="polarbear: tell the model to give the result in the unit asked for (a percent as 25, not 0.25)")
     r.add_argument("--prose-retry", action="store_true",
                    help="polarbear: retry once when the reply's own prose answer differs from the formula result (a dropped step); the first answer is kept unless the retry agrees with its prose")
+    r.add_argument("--route", action="store_true",
+                   help="polarbear: answer plainly first; keep that answer when it only read a value off the question, solve the rest with the formula pipeline")
     r.add_argument("--lookup-hint", action="store_true",
                    help="polarbear: for pick/count questions, list the relevant values first, then answer (the plain instruction made such replies terse)")
     r.add_argument("--multistep", action="store_true",
