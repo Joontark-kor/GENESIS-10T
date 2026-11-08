@@ -1,4 +1,4 @@
-"""Gorilla: let the model write the formula and let a calculator do the arithmetic.
+"""Polarbear: let the model write the formula and let a calculator do the arithmetic.
 
 The model is asked to answer with one line ``계산식: <expression>`` (numbers taken from the
 question and the four operations only). The pipeline evaluates that line with
@@ -25,7 +25,7 @@ RETRY_INSTRUCTION = ("\n\n직접 계산하지 말고 마지막 줄에 '계산식
 # Optional (--distractor-hint): numbers that do not belong to what is asked are a known failure of
 # LLMs on word problems (Shi et al. 2023, "Large Language Models Can Be Easily Distracted by Irrelevant
 # Context"; arXiv 2406.15444 adds irrelevant numbers and sees ~26% relative drops). Domain-neutral wording.
-# Not yet measured here: compare calc-gorilla and calc-gorilla-hint on the same 420 items.
+# Not yet measured here: compare calc-polarbear and calc-polarbear-hint on the same 420 items.
 DISTRACTOR_HINT = ("\n수식에는 질문이 묻는 값에 실제로 쓰이는 숫자만 넣으세요. "
                    "'제외', '빼고', '별도'라고 한 항목이나 값과 관계없는 숫자(번호, 연도, 배송비 등)는 넣지 마세요.")
 RETRY_PREFILL = "계산식: "
@@ -52,7 +52,7 @@ _FORMULA = re.compile(r"\d\s*[+*/×÷]\s*[\d(]|\d\s+[-−]\s+[\d(]")
 
 
 def with_instruction(item: dict, text: str = INSTRUCTION) -> dict:
-    """A copy of the eval item whose last user message carries the gorilla instruction."""
+    """A copy of the eval item whose last user message carries the polarbear instruction."""
     clone = copy.deepcopy(item)
     for message in reversed(clone["messages"]):
         if message["role"] == "user":
@@ -201,7 +201,7 @@ def looked_up(question: str, reply: str) -> bool:
 class CalcPipeline:
     """Wraps any generator (local model or endpoint) of ``genesis.harness.evaluate``."""
 
-    name = "gorilla"
+    name = "polarbear"
 
     def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
                  prefill: bool = False, direction_retry: bool = False, unit_hint: bool = False,

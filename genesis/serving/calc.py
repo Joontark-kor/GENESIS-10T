@@ -1,7 +1,7 @@
 """Ask a served model a numeric question and get back an answer you can check.
 
-The model writes the formula, ``genesis.tools.calculate`` does the arithmetic (the "gorilla" structure,
-see docs/12_gorilla_ko.md). Unlike the evaluation harness, an app needs more than a score: it needs to
+The model writes the formula, ``genesis.tools.calculate`` does the arithmetic (the "polarbear" structure,
+see docs/12_polarbear_ko.md). Unlike the evaluation harness, an app needs more than a score: it needs to
 see *which formula* produced the number, and whether anything looked off. ``CalcResult`` carries both.
 
     python -m genesis.serving.calc --url http://localhost:8000/v1 --model fin "정가 12,000원, 15% 할인가는?"
@@ -14,7 +14,7 @@ import argparse
 import json
 from dataclasses import asdict, dataclass, field
 
-from genesis.harness.gorilla import (CalcPipeline, direction_flag, expression_of, looked_up, percent_flag,
+from genesis.harness.polarbear import (CalcPipeline, direction_flag, expression_of, looked_up, percent_flag,
                                      prose_mismatch, question_text, ungrounded)
 from genesis.serving.endpoint import EndpointClient
 from genesis.tools import CalculationError, calculate, format_number

@@ -1,6 +1,6 @@
 import pytest
 
-from genesis.harness.gorilla import CalcPipeline, finish, with_instruction
+from genesis.harness.polarbear import CalcPipeline, finish, with_instruction
 from genesis.harness.scorers import numeric
 from genesis.tools import CalculationError, calculate, format_number
 
@@ -53,14 +53,14 @@ def test_pipeline_wraps_a_generator_and_counts_fallbacks():
 
 
 def test_ungrounded_finds_numbers_missing_from_the_question():
-    from genesis.harness.gorilla import ungrounded
+    from genesis.harness.polarbear import ungrounded
     question = "당기순이익 10,682백만원, 자기자본 106,826백만원일 때 ROE는?"
     assert ungrounded(question, "10682 / 106826 * 100") == []
     assert ungrounded(question, "10682.6 / 106826 * 100") == [10682.6]
 
 
 def test_pipeline_counts_ungrounded_without_changing_the_answer():
-    from genesis.harness.gorilla import CalcPipeline
+    from genesis.harness.polarbear import CalcPipeline
 
     class Fake:
         def generate(self, batch):
@@ -88,7 +88,7 @@ def test_formula_typed_on_the_answer_line_is_still_calculated():
 
 
 def test_looked_up_tells_a_table_value_from_a_number_worked_out_in_the_head():
-    from genesis.harness.gorilla import looked_up
+    from genesis.harness.polarbear import looked_up
     question = "매출액 106,826백만원, 영업이익 10,682백만원이다."
     assert looked_up(question, "정답: 106,826")
     assert not looked_up(question, "정답: 10")  # not in the question: computed
@@ -139,12 +139,12 @@ def test_retry_can_be_switched_off():
 
 
 def test_known_limit_an_answer_equal_to_a_number_in_the_question_is_not_retried():
-    from genesis.harness.gorilla import looked_up
+    from genesis.harness.polarbear import looked_up
     assert looked_up("A는 6, B는 3이다. A÷B는?", "정답: 3")  # 6/3 = 2 would be caught; this guess is not
 
 
 def test_distractor_hint_is_opt_in_and_reaches_first_pass_and_retry():
-    from genesis.harness.gorilla import DISTRACTOR_HINT
+    from genesis.harness.polarbear import DISTRACTOR_HINT
     item = {"messages": [{"role": "user", "content": "A는 8, B는 4이다. A÷B는?"}]}
     plain = _Scripted([("정답: 2", 1)], [("계산식: 8 / 4", 1)])
     CalcPipeline(plain).generate([item])
@@ -174,7 +174,7 @@ def test_retry_prefill_is_opt_in_and_only_on_the_retry():
 
 
 def test_ungrounded_accepts_percent_forms_of_question_numbers():
-    from genesis.harness.gorilla import ungrounded
+    from genesis.harness.polarbear import ungrounded
     question = "원금 480만원, 연 3% 단리로 4년"
     assert ungrounded(question, "4800000 * 0.03 * 4") == []  # 480만 = 4800000 is the same figure
     assert ungrounded(question, "4900000 * 0.03 * 4") == [4900000.0]
@@ -183,7 +183,7 @@ def test_ungrounded_accepts_percent_forms_of_question_numbers():
 
 
 def test_direction_flag_catches_dividing_by_the_new_value():
-    from genesis.harness.gorilla import direction_flag
+    from genesis.harness.polarbear import direction_flag
     question = "3,320에서 7,240으로 바뀌었다. 증감률은 몇 %인가?"
     assert direction_flag(question, "(7240 - 3320) / 7240 * 100") is True
     assert direction_flag(question, "(7240 - 3320) / 3320 * 100") is False
@@ -191,7 +191,7 @@ def test_direction_flag_catches_dividing_by_the_new_value():
 
 
 def test_pipeline_counts_direction_flags_without_changing_the_answer():
-    from genesis.harness.gorilla import CalcPipeline
+    from genesis.harness.polarbear import CalcPipeline
 
     class Fake:
         def generate(self, batch):
@@ -204,7 +204,7 @@ def test_pipeline_counts_direction_flags_without_changing_the_answer():
 
 
 def test_direction_retry_is_opt_in_and_only_replaces_with_a_fixed_formula():
-    from genesis.harness.gorilla import CalcPipeline
+    from genesis.harness.polarbear import CalcPipeline
 
     class Fake:
         def __init__(self):
@@ -228,12 +228,12 @@ def test_direction_retry_is_opt_in_and_only_replaces_with_a_fixed_formula():
 
 
 def test_direction_flag_skips_decrease_rate_questions():
-    from genesis.harness.gorilla import direction_flag
+    from genesis.harness.polarbear import direction_flag
     assert direction_flag("7240에서 3320으로. 감소율은?", "(7240 - 3320) / 7240 * 100") is False
 
 
 def test_unit_hint_is_opt_in_and_reaches_first_pass_and_retry():
-    from genesis.harness.gorilla import CalcPipeline, UNIT_HINT
+    from genesis.harness.polarbear import CalcPipeline, UNIT_HINT
 
     class Fake:
         def __init__(self):
@@ -251,7 +251,7 @@ def test_unit_hint_is_opt_in_and_reaches_first_pass_and_retry():
 
 
 def test_contradiction_finds_numbers_listed_as_excluded_but_used():
-    from genesis.harness.gorilla import contradiction
+    from genesis.harness.polarbear import contradiction
     reply = "제외: 4\n계산식: 2000*(1+0.04)^5 - 4"
     assert contradiction(reply, "2000*(1+0.04)^5 - 4") == [4.0]
     assert contradiction("제외: 4\n계산식: 2000*(1+0.04)^5", "2000*(1+0.04)^5") == []
@@ -260,7 +260,7 @@ def test_contradiction_finds_numbers_listed_as_excluded_but_used():
 
 
 def test_exclude_check_retries_a_self_contradicting_formula_and_keeps_the_fixed_one():
-    from genesis.harness.gorilla import CalcPipeline
+    from genesis.harness.polarbear import CalcPipeline
 
     class Fake:
         def __init__(self):
@@ -283,7 +283,7 @@ def test_exclude_check_retries_a_self_contradicting_formula_and_keeps_the_fixed_
 
 
 def test_square_in_formula_is_structure_and_percent_question_without_100_is_flagged():
-    from genesis.harness.gorilla import percent_flag, ungrounded
+    from genesis.harness.polarbear import percent_flag, ungrounded
     assert ungrounded("90kg, 키 180cm인 사람의 BMI는?", "90/(1.8^2)") == []
     assert ungrounded("90kg, 키 180cm인 사람의 BMI는?", "90/(1.8**2) + 7") == [7.0]
     assert percent_flag("연평균 성장률은 몇 %인가?", "(3500/2000)^(1/3) - 1")
@@ -292,7 +292,7 @@ def test_square_in_formula_is_structure_and_percent_question_without_100_is_flag
 
 
 def test_multistep_formulas_are_joined_and_calculated_once():
-    from genesis.harness.gorilla import expression_of, finish, ungrounded
+    from genesis.harness.polarbear import expression_of, finish, ungrounded
     reply = "계산식: 1000 * 5 / 100\n계산식: 1000 + #1"
     assert expression_of(reply) == "1000 + (1000 * 5 / 100)"
     assert finish(reply)[0].endswith("정답: 1050") and finish(reply)[1]
@@ -302,7 +302,7 @@ def test_multistep_formulas_are_joined_and_calculated_once():
 
 
 def test_scaled_units_are_not_made_up_and_missing_parentheses_before_100_is_flagged():
-    from genesis.harness.gorilla import percent_flag, ungrounded
+    from genesis.harness.polarbear import percent_flag, ungrounded
     assert ungrounded("1,000만원을 2년간", "10000000 * (1 + 0.06)^2") == [0.06]
     assert ungrounded("2,000억원에서 3,500억원", "3500/2000") == []
     assert percent_flag("성장률은 몇 %인가?", "(3500/2000)^(1/3)-1*100")
@@ -310,7 +310,7 @@ def test_scaled_units_are_not_made_up_and_missing_parentheses_before_100_is_flag
 
 
 def test_prose_mismatch_flags_a_formula_that_stops_early_and_ignores_agreement():
-    from genesis.harness.gorilla import prose_mismatch
+    from genesis.harness.polarbear import prose_mismatch
     q = "2300만원을 연 7% 단리로 9년 빌렸다. 108개월로 나누면 매달 몇 만원인가?"
     bad = "총 이자는 2300 × 0.07 × 9 = 1449, 합계 3749, 108개월로 나누면 34.71만원입니다.\n\n계산식: (2300 + 2300 * 0.07 * 9)\n정답: 3749"
     assert prose_mismatch(q, bad, 3749.0) == 34.71
@@ -320,7 +320,7 @@ def test_prose_mismatch_flags_a_formula_that_stops_early_and_ignores_agreement()
 
 
 def test_prose_retry_replaces_a_dropped_step_formula_only_when_the_retry_agrees_with_its_prose():
-    from genesis.harness.gorilla import CalcPipeline
+    from genesis.harness.polarbear import CalcPipeline
 
     class Fake:
         def __init__(self, *outs):

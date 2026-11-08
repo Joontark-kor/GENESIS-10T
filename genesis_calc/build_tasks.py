@@ -2,7 +2,7 @@
 
     python -m genesis_calc.build_tasks --out data/applied/calc_v1 --per-kind 60 --seed 1
 
-Purpose: test whether the gorilla pipeline (model writes the formula, a calculator computes)
+Purpose: test whether the polarbear pipeline (model writes the formula, a calculator computes)
 helps outside finance. Every answer is computed from the numbers in the question; each
 question also carries one or two distractor numbers the formula must not use.
 Eval only (no training split): a second-domain check, not a second adapter.
@@ -109,7 +109,7 @@ _NAMES = ("서울", "부산", "대구", "인천", "광주", "대전", "울산", 
 def make_lookup(kind: str, rng: random.Random) -> tuple[str, float | str, float]:
     """(question, gold, tolerance) for the guard set: nothing to calculate, only reading a table or counting.
 
-    The gorilla pipeline must not turn these into formulas. Name answers use the exact scorer."""
+    The polarbear pipeline must not turn these into formulas. Name answers use the exact scorer."""
     names = rng.sample(_NAMES, 5)
     values = rng.sample(range(100, 1000), 5)
     table = ", ".join(f"{n} {v}명" for n, v in zip(names, values))

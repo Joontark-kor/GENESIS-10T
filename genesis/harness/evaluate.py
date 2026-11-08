@@ -108,7 +108,7 @@ class LocalGenerator:
 
     def generate(self, batch: list[dict]) -> list[tuple[str, int]]:
         tok = self.tokenizer
-        # an item may carry "prefill": the reply is forced to start with that text (the gorilla retry uses it)
+        # an item may carry "prefill": the reply is forced to start with that text (the polarbear retry uses it)
         prefills = [item.get("prefill", "") for item in batch]
         prompts = [render(tok, item["messages"], add_generation_prompt=True, template_kwargs=self.template_kwargs) + pre
                    for item, pre in zip(batch, prefills)]
@@ -153,8 +153,8 @@ def run(args) -> dict:
     if args.limit:
         items = items[:args.limit]
     generator = EndpointGenerator(args) if args.endpoint else LocalGenerator(args)
-    if args.pipeline == "gorilla":
-        from genesis.harness.gorilla import CalcPipeline
+    if args.pipeline == "polarbear":
+        from genesis.harness.polarbear import CalcPipeline
 
         generator = CalcPipeline(generator, digits=args.pipeline_digits, retry=not args.no_pipeline_retry,
                                 hint=args.distractor_hint, prefill=args.retry_prefill,
@@ -262,25 +262,25 @@ def main(argv: list[str] | None = None):
     r.add_argument("--load-4bit", action="store_true")
     r.add_argument("--template-kwargs", default="{}")
     r.add_argument("--cpu", action="store_true")
-    r.add_argument("--pipeline", choices=["none", "gorilla"], default="none",
-                   help="gorilla: the model writes a formula, a calculator computes the answer")
+    r.add_argument("--pipeline", choices=["none", "polarbear"], default="none",
+                   help="polarbear: the model writes a formula, a calculator computes the answer")
     r.add_argument("--pipeline-digits", type=int, default=2, help="decimals of the calculated answer")
     r.add_argument("--no-pipeline-retry", action="store_true",
-                   help="gorilla: do not retry answers worked out without a formula (reproduces the 2026-11-06 numbers)")
+                   help="polarbear: do not retry answers worked out without a formula (reproduces the 2026-11-06 numbers)")
     r.add_argument("--distractor-hint", action="store_true",
-                   help="gorilla: tell the model to leave numbers that do not belong to the question out of the formula")
+                   help="polarbear: tell the model to leave numbers that do not belong to the question out of the formula")
     r.add_argument("--retry-prefill", action="store_true",
-                   help="gorilla: the retry reply starts with '계산식:' so the model cannot answer directly (local models only)")
+                   help="polarbear: the retry reply starts with '계산식:' so the model cannot answer directly (local models only)")
     r.add_argument("--direction-retry", action="store_true",
-                   help="gorilla: retry once, with a hint, when a rate-of-change formula divides by the new value")
+                   help="polarbear: retry once, with a hint, when a rate-of-change formula divides by the new value")
     r.add_argument("--unit-hint", action="store_true",
-                   help="gorilla: tell the model to give the result in the unit asked for (a percent as 25, not 0.25)")
+                   help="polarbear: tell the model to give the result in the unit asked for (a percent as 25, not 0.25)")
     r.add_argument("--prose-retry", action="store_true",
-                   help="gorilla: retry once when the reply's own prose answer differs from the formula result (a dropped step); the first answer is kept unless the retry agrees with its prose")
+                   help="polarbear: retry once when the reply's own prose answer differs from the formula result (a dropped step); the first answer is kept unless the retry agrees with its prose")
     r.add_argument("--multistep", action="store_true",
-                   help="gorilla: allow several 계산식 lines; #1 is the first line's result")
+                   help="polarbear: allow several 계산식 lines; #1 is the first line's result")
     r.add_argument("--exclude-check", action="store_true",
-                   help="gorilla: the model lists the numbers it will not use first; a formula that uses one is retried once. Only for questions with distractor numbers: on the finance set it dropped accuracy from ~98.8% to 75.9%")
+                   help="polarbear: the model lists the numbers it will not use first; a formula that uses one is retried once. Only for questions with distractor numbers: on the finance set it dropped accuracy from ~98.8% to 75.9%")
     c = sub.add_parser("compare")
     c.add_argument("reports", type=Path, nargs="+")
     args = p.parse_args(argv)
