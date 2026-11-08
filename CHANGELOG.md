@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Renamed the "gorilla" pipeline to "polarbear" (module `genesis.harness.polarbear`, `--pipeline polarbear`, docs/12_polarbear_ko.md, notebooks/polarbear_check_*.ipynb). Earlier entries below keep the old name.
 - gorilla: two escape hatches closed. A formula typed on the `정답:` line is now calculated, and an answer that is not a formula and not a number copied from the question (worked out in the model's head) gets one retry that asks for the formula only. `--no-pipeline-retry` reproduces the earlier numbers; reports add `pipeline_retried` / `pipeline_rescued`. Known limit: an answer that happens to equal a number in the question is treated as a lookup and not retried. Not yet measured on a GPU.
 
 - Colab without Google Drive: `genesis.hubsync` (private Hugging Face repos; background uploader, restore + `--resume`), `fin_colab.ipynb` reads `fin_v1.zip` from a private dataset repo with the Colab Secret `HF_TOKEN` and pushes checkpoints/reports to a private model repo.

@@ -109,7 +109,7 @@ _NAMES = ("서울", "부산", "대구", "인천", "광주", "대전", "울산", 
 def make_lookup(kind: str, rng: random.Random) -> tuple[str, float | str, float]:
     """(question, gold, tolerance) for the guard set: nothing to calculate, only reading a table or counting.
 
-    The gorilla pipeline must not turn these into formulas. Name answers use the exact scorer."""
+    The polarbear pipeline must not turn these into formulas. Name answers use the exact scorer."""
     names = rng.sample(_NAMES, 5)
     values = rng.sample(range(100, 1000), 5)
     table = ", ".join(f"{n} {v}명" for n, v in zip(names, values))
