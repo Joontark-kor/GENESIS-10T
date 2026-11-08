@@ -159,7 +159,7 @@ def run(args) -> dict:
         generator = CalcPipeline(generator, digits=args.pipeline_digits, retry=not args.no_pipeline_retry,
                                 hint=args.distractor_hint, prefill=args.retry_prefill,
                                 direction_retry=args.direction_retry, unit_hint=args.unit_hint,
-                                exclude_check=args.exclude_check, multistep=args.multistep)
+                                exclude_check=args.exclude_check, multistep=args.multistep, prose_retry=args.prose_retry)
     default_scorer = args.scorer
     rows, generated_tokens = [], 0
     generator.sync()
@@ -207,6 +207,9 @@ def run(args) -> dict:
                      "pipeline_contradiction_rescued": getattr(generator, "contradiction_rescued", None),
                      "pipeline_unit_hint": getattr(generator, "unit_hint", None),
                      "pipeline_multistep": getattr(generator, "multistep", None),
+                     "pipeline_prose_retry": getattr(generator, "prose_retry", None),
+                     "pipeline_prose_flagged": getattr(generator, "prose_flagged", None),
+                     "pipeline_prose_rescued": getattr(generator, "prose_rescued", None),
                      "pipeline_direction_retry": getattr(generator, "direction_retry", None),
                      "pipeline_direction_rescued": getattr(generator, "direction_rescued", None),
                      "pipeline_retried": getattr(generator, "retried", None),
@@ -272,6 +275,8 @@ def main(argv: list[str] | None = None):
                    help="gorilla: retry once, with a hint, when a rate-of-change formula divides by the new value")
     r.add_argument("--unit-hint", action="store_true",
                    help="gorilla: tell the model to give the result in the unit asked for (a percent as 25, not 0.25)")
+    r.add_argument("--prose-retry", action="store_true",
+                   help="gorilla: retry once when the reply's own prose answer differs from the formula result (a dropped step); the first answer is kept unless the retry agrees with its prose")
     r.add_argument("--multistep", action="store_true",
                    help="gorilla: allow several 계산식 lines; #1 is the first line's result")
     r.add_argument("--exclude-check", action="store_true",

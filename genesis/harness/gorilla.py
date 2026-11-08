@@ -42,6 +42,9 @@ UNIT_HINT = ("\n답의 단위가 %이면 식의 결과가 퍼센트 값 그대�
 # Optional (--direction-retry): sent only when direction_flag fired on a rate-of-change formula.
 DIRECTION_HINT = ("\n증감률·성장률은 (나중 값 - 처음 값) / 처음 값입니다. 나누는 수는 비교의 출발점인 처음(기준) 값이고, "
                   "값이 줄었으면 결과는 음수입니다.")
+# Optional (--prose-retry): sent when the prose's last figure differs from the formula's result (a dropped step).
+PROSE_HINT = ("\n설명에서 구한 최종 값과 계산식의 결과가 다릅니다. 모든 단계를 한 줄의 계산식에 넣어 "
+              "최종 답이 나오게 다시 쓰세요.")
 _EXPRESSION = re.compile(r"(?:계산식|Expression|式)\s*[:：]\s*(.+)", re.IGNORECASE)
 _ANSWER = re.compile(r"정답\s*[:：]\s*(.+)")
 # arithmetic between numbers on an answer line: "134000 × (1 - 0.3)"; a bare "2023-2024" is not a formula
@@ -202,8 +205,9 @@ class CalcPipeline:
 
     def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
                  prefill: bool = False, direction_retry: bool = False, unit_hint: bool = False,
-                 exclude_check: bool = False, multistep: bool = False):
+                 exclude_check: bool = False, multistep: bool = False, prose_retry: bool = False):
         self.unit_hint, self.exclude_check, self.multistep = unit_hint, exclude_check, multistep
+        self.prose_retry, self.prose_flagged, self.prose_rescued = prose_retry, 0, 0
         self.contradicted = self.contradiction_rescued = 0
         self.base, self.digits, self.retry, self.hint, self.prefill = base, digits, retry, hint, prefill
         self.direction_retry = direction_retry
@@ -224,6 +228,15 @@ class CalcPipeline:
         flagged = direction_flag(question, expression)
         self.direction += flagged
         return flagged
+
+    def _dropped_step(self, item: dict, reply: str) -> float | None:
+        expression = expression_of(reply)
+        if expression is None:
+            return None
+        try:
+            return prose_mismatch(question_text(item), reply, calculate(expression))
+        except CalculationError:
+            return None
 
     def _extra(self) -> str:
         return ((DISTRACTOR_HINT if self.hint else "") + (UNIT_HINT if self.unit_hint else "")
@@ -255,6 +268,10 @@ class CalcPipeline:
                 elif wrong_way and self.direction_retry:
                     again.append(index)
                     flagged[index] = DIRECTION_HINT
+                elif self.prose_retry and self._dropped_step(item, text) is not None:
+                    self.prose_flagged += 1
+                    again.append(index)
+                    flagged[index] = PROSE_HINT
             elif self.retry and not looked_up(question_text(item), text):
                 again.append(index)
             results.append([final, n_tokens, used])
@@ -269,6 +286,11 @@ class CalcPipeline:
                 if index in flagged:  # keep the first answer unless the retry fixed what was flagged
                     again_wrong = self._check_grounding(batch[index], text)
                     clash = contradiction(text, expression_of(text) or "") if self.exclude_check else []
+                    if flagged[index] == PROSE_HINT:  # keep the first answer unless the retry now agrees with its prose
+                        if self._dropped_step(batch[index], text) is None and not clash:
+                            self.prose_rescued += 1
+                            results[index][0] = final
+                        continue
                     if not clash and not (again_wrong and flagged[index] == DIRECTION_HINT):
                         if flagged[index] == DIRECTION_HINT:
                             self.direction_rescued += 1
