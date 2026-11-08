@@ -106,8 +106,8 @@ def make_multi(kind: str, rng: random.Random) -> tuple[str, float, float]:
     """(question, gold, tolerance) for the multi-step set: the answer needs an intermediate value first."""
     if kind == "discount_tax_split":
         price, d, t, n = rng.randint(20, 200) * 1000, rng.choice([10, 15, 20, 25, 30]), rng.choice([5, 8, 10]), rng.randint(2, 6)
-        q = (f"정가 {price:,}원짜리를 {d}% 할인받고, 할인된 금액에 부가세 {t}%가 붙는다. 이를 {n}명이 똑같이 나눠 내면 "
-             f"1인당 얼마인가? (원 단위, 소수 둘째 자리)")
+        q = (f"정가 {price:,}원짜리를 {d}% 할인받아 할인가(정가에서 할인액을 뺀 가격)가 되었고, 그 할인가에 부가세 {t}%가 더해진다. "
+             f"이 최종 금액을 {n}명이 똑같이 나눠 내면 1인당 얼마인가? (원 단위, 소수 둘째 자리)")
         return q, _round(price * (1 - d / 100) * (1 + t / 100) / n), 0.5
     if kind == "loan_monthly":
         p, r, y = rng.randint(5, 50) * 100, rng.choice([3, 4, 5, 6, 7]), rng.randint(2, 10)
