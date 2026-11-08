@@ -14,7 +14,8 @@ import argparse
 import json
 from dataclasses import asdict, dataclass, field
 
-from genesis.harness.gorilla import (CalcPipeline, direction_flag, expression_of, question_text, ungrounded)
+from genesis.harness.gorilla import (CalcPipeline, direction_flag, expression_of, looked_up, question_text,
+                                     ungrounded)
 from genesis.serving.endpoint import EndpointClient
 from genesis.tools import CalculationError, calculate, format_number
 
@@ -33,24 +34,35 @@ class CalcResult:
 class _Generator:
     """The harness pipeline talks to a ``generate(batch)`` object; this one calls the endpoint."""
 
-    def __init__(self, client: EndpointClient, model: str, max_tokens: int, template_kwargs: dict | None):
+    def __init__(self, client: EndpointClient, model: str, max_tokens: int, template_kwargs: dict | None,
+                 prefill: bool = False):
         self.client, self.model, self.max_tokens, self.template_kwargs = client, model, max_tokens, template_kwargs
+        self.prefill = prefill
 
     def generate(self, batch: list[dict]) -> list[tuple[str, int]]:
         out = []
         for item in batch:
-            reply = self.client.chat(self.model, item["messages"], max_tokens=self.max_tokens,
-                                     template_kwargs=self.template_kwargs)
-            out.append((reply.text, reply.completion_tokens))
+            messages, extra, start = item["messages"], {}, ""
+            if self.prefill and item.get("prefill"):
+                # the retry starts the reply for the model (vLLM / mini_server: continue_final_message), so it
+                # cannot answer in its head; the server returns only what follows the prefill
+                start = item["prefill"]
+                messages = messages + [{"role": "assistant", "content": start}]
+                extra = {"continue_final_message": True, "add_generation_prompt": False}
+            reply = self.client.chat(self.model, messages, max_tokens=self.max_tokens,
+                                     template_kwargs=self.template_kwargs, **extra)
+            out.append((start + reply.text, reply.completion_tokens))
         return out
 
 
 class CalcClient:
     def __init__(self, client: EndpointClient, model: str, digits: int = 2, retry: bool = True,
-                 hint: bool = False, max_tokens: int = 160, template_kwargs: dict | None = None):
-        # prefill needs local generation, so it is not offered here (an endpoint ignores it)
-        self.pipeline = CalcPipeline(_Generator(client, model, max_tokens, template_kwargs),
-                                     digits=digits, retry=retry, hint=hint)
+                 hint: bool = False, max_tokens: int = 160, template_kwargs: dict | None = None,
+                 prefill: bool = False):
+        # prefill=True needs a server that continues a final assistant message (vLLM, genesis mini_server);
+        # Ollama and others ignore it, so it is off by default
+        self.pipeline = CalcPipeline(_Generator(client, model, max_tokens, template_kwargs, prefill),
+                                     digits=digits, retry=retry, hint=hint, prefill=prefill)
         self.digits = digits
 
     def ask(self, messages: list[dict]) -> CalcResult:
@@ -70,7 +82,7 @@ class CalcClient:
                     warnings.append("질문에 없는 숫자가 식에 있습니다: " + ", ".join(f"{n:g}" for n in missing))
                 if direction_flag(question_text(item), formula):
                     warnings.append("증감률 식의 방향(부호)을 확인하세요")
-        else:
+        elif not looked_up(question_text(item), text):  # an answer read off the question, or a name, needs no formula
             warnings.append("식 없이 답했습니다(계산기를 쓰지 않음)")
         return CalcResult(text=text, answer=answer, formula=formula, used_calculator=answer is not None,
                           retried=self.pipeline.retried > before, warnings=warnings, completion_tokens=tokens)
@@ -82,10 +94,11 @@ def main(argv: list[str] | None = None) -> CalcResult:
     p.add_argument("--model", required=True)
     p.add_argument("--distractor-hint", action="store_true")
     p.add_argument("--no-retry", action="store_true")
+    p.add_argument("--prefill", action="store_true", help="retry with '계산식:' already written (vLLM, mini_server)")
     p.add_argument("question")
     args = p.parse_args(argv)
     result = CalcClient(EndpointClient(args.url), args.model, retry=not args.no_retry,
-                        hint=args.distractor_hint).ask([{"role": "user", "content": args.question}])
+                        hint=args.distractor_hint, prefill=args.prefill).ask([{"role": "user", "content": args.question}])
     print(json.dumps(asdict(result), ensure_ascii=False, indent=2))
     return result
 
