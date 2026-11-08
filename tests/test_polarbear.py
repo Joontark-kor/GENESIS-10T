@@ -338,3 +338,21 @@ def test_prose_retry_replaces_a_dropped_step_formula_only_when_the_retry_agrees_
     assert stuck.generate([q])[0][0].endswith("정답: 3749") and stuck.prose_rescued == 0
     off = CalcPipeline(Fake(first))
     assert off.generate([q])[0][0].endswith("정답: 3749") and off.prose_flagged == 0
+
+
+def test_lookup_hint_is_added_to_the_request_only_when_asked():
+    from genesis.harness.polarbear import LOOKUP_HINT, CalcPipeline
+
+    class Echo:
+        def __init__(self):
+            self.sent = []
+
+        def generate(self, batch):
+            self.sent += [b["messages"][-1]["content"] for b in batch]
+            return [("정답: 서울", 3) for _ in batch]
+
+    item = {"messages": [{"role": "user", "content": "가장 많은 곳은?"}]}
+    on, off = Echo(), Echo()
+    CalcPipeline(on, lookup_hint=True).generate([item])
+    CalcPipeline(off).generate([item])
+    assert LOOKUP_HINT in on.sent[0] and LOOKUP_HINT not in off.sent[0]

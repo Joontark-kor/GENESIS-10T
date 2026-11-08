@@ -42,6 +42,9 @@ UNIT_HINT = ("\n답의 단위가 %이면 식의 결과가 퍼센트 값 그대�
 # Optional (--direction-retry): sent only when direction_flag fired on a rate-of-change formula.
 DIRECTION_HINT = ("\n증감률·성장률은 (나중 값 - 처음 값) / 처음 값입니다. 나누는 수는 비교의 출발점인 처음(기준) 값이고, "
                   "값이 줄었으면 결과는 음수입니다.")
+# Optional (--lookup-hint): on a set with nothing to calculate (pick the largest, count items over a limit) the
+# instruction made replies terse ("정답: 서울" with no reasoning) and accuracy fell 85.8% -> 81.2%.
+LOOKUP_HINT = "\n표나 목록에서 값을 고르거나 세는 질문이면, 먼저 관련 값을 한 줄씩 나열한 뒤 '정답: 값'을 쓰세요."
 # Optional (--prose-retry): sent when the prose's last figure differs from the formula's result (a dropped step).
 PROSE_HINT = ("\n설명에서 구한 최종 값과 계산식의 결과가 다릅니다. 모든 단계를 한 줄의 계산식에 넣어 "
               "최종 답이 나오게 다시 쓰세요.")
@@ -205,7 +208,9 @@ class CalcPipeline:
 
     def __init__(self, base, digits: int = 2, retry: bool = True, hint: bool = False,
                  prefill: bool = False, direction_retry: bool = False, unit_hint: bool = False,
-                 exclude_check: bool = False, multistep: bool = False, prose_retry: bool = False):
+                 exclude_check: bool = False, multistep: bool = False, prose_retry: bool = False,
+                 lookup_hint: bool = False):
+        self.lookup_hint = lookup_hint
         self.unit_hint, self.exclude_check, self.multistep = unit_hint, exclude_check, multistep
         self.prose_retry, self.prose_flagged, self.prose_rescued = prose_retry, 0, 0
         self.contradicted = self.contradiction_rescued = 0
@@ -240,7 +245,7 @@ class CalcPipeline:
 
     def _extra(self) -> str:
         return ((DISTRACTOR_HINT if self.hint else "") + (UNIT_HINT if self.unit_hint else "")
-                + (MULTISTEP_HINT if self.multistep else "")
+                + (MULTISTEP_HINT if self.multistep else "") + (LOOKUP_HINT if self.lookup_hint else "")
                 + (EXCLUDE_HINT if self.exclude_check else ""))
 
     def _retry_item(self, item: dict, note: str = "") -> dict:
