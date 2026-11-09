@@ -19,7 +19,8 @@ def _imports(package: str) -> dict[str, set[str]]:
 
 
 def test_core_never_imports_domain_packages():
-    offenders = {f: n & {"genesis_fin"} for f, n in _imports("genesis").items() if n & {"genesis_fin"}}
+    domain = {"genesis_fin", "genesis_calc", "genesis_predict"}
+    offenders = {f: n & domain for f, n in _imports("genesis").items() if n & domain}
     assert not offenders, f"genesis core must not depend on domain packages: {offenders}"
 
 
