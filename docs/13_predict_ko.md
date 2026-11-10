@@ -26,7 +26,7 @@
 | 부분 | 쓰는 것 | 이유 |
 |---|---|---|
 | 기준선 | seasonal naive, ETS, AutoARIMA (`statsforecast`) | 엔진이 넘어야 할 선 |
-| 사건 엔진 | Chronos-2 (28M/120M, CPU 가능) | 공변량 지원, 가벼움 |
+| 사건 엔진 | Chronos-2 small 28M (`autogluon/chronos-2-small`, CPU) | 공변량 지원, 가벼움 |
 | 비교 | TimesFM 2.5 (Apache 2.0) | TimesFM 3.0은 비상업 라이선스라 제외 |
 | 물리 | `pint`(단위), 닫힌 해 템플릿 10종, `scipy`로 교차 검증 | CPU, 4B 모델에 솔버 생성을 맡기지 않음 |
 
