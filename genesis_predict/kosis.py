@@ -46,7 +46,7 @@ def fetch_table(api_key: str, org_id: str, tbl_id: str, start: str, end: str, le
                   "format": "json", "jsonVD": "Y"}
         for i in range(1, levels + 1):
             params[f"objL{i}"] = "ALL"
-        with opener(URL + "?" + urllib.parse.urlencode(params), timeout=60) as r:
+        with opener(URL + "?" + urllib.parse.urlencode(params), timeout=30) as r:
             data = json.loads(r.read().decode("utf-8"))
         if isinstance(data, dict):
             raise RuntimeError(f"{org_id}/{tbl_id} {a}-{b}: {data.get('err')} {data.get('errMsg')}")
@@ -97,17 +97,39 @@ def write_csv(series: dict[str, dict], ids: list[str], path: str) -> None:
                 w.writerow([sid, f"{m[:4]}-{m[4:]}", v])
 
 
+def probe(api_key: str, org_id: str, tbl_id: str) -> None:
+    """Print timing/shape of a few period ranges for one table (diagnostics only; key masked)."""
+    for a, b in [("202401", "202401"), ("202401", "202412"), ("201501", "201501"), ("201501", "201512"), ("201501", "202510")]:
+        params = {"method": "getList", "apiKey": api_key, "orgId": org_id, "tblId": tbl_id, "itmId": "ALL",
+                  "objL1": "ALL", "prdSe": "M", "startPrdDe": a, "endPrdDe": b, "format": "json", "jsonVD": "Y"}
+        t0 = time.time()
+        try:
+            with urllib.request.urlopen(URL + "?" + urllib.parse.urlencode(params), timeout=30) as r:
+                body = r.read().decode("utf-8")
+            data = json.loads(body)
+            info = (f"rows={len(data)} first={data[0].get('PRD_DE')} last={data[-1].get('PRD_DE')}"
+                    if isinstance(data, list) else f"err={data}")
+        except Exception as exc:
+            info = f"exception={type(exc).__name__}: {str(exc)[:80]}"
+        print(f"{tbl_id} {a}-{b} {time.time() - t0:.1f}s {info}".replace(api_key, "***"), flush=True)
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--tables", required=True, help="JSON list of {org, tbl, levels, note}")
+    p.add_argument("--tables", help="JSON list of {org, tbl, levels, note}")
+    p.add_argument("--probe", help="diagnose one table: ORG/TBL")
     p.add_argument("--start", default="201501")
     p.add_argument("--end", default="202510")
     p.add_argument("--per-table", type=int, default=12)
     p.add_argument("--target", type=int, default=60)
-    p.add_argument("--out", required=True)
-    p.add_argument("--list", required=True)
+    p.add_argument("--out")
+    p.add_argument("--list")
     a = p.parse_args(argv)
     key = os.environ["KOSIS_API_KEY"]
+    if a.probe:
+        org, tbl = a.probe.split("/")
+        probe(key, org, tbl)
+        return
     tables = json.load(open(a.tables, encoding="utf-8"))
     series, log = {}, []
     for t in tables:
