@@ -61,7 +61,7 @@ def run(series: dict[str, list[tuple[str, float]]], engines: list[str], origins:
                                  "actual": float(future[s]), "median": float(fc.median[s]),
                                  "mase": metrics.mase([future[s]], [fc.median[s]], hist, season),
                                  "crps": metrics.crps_from_quantiles(float(future[s]), qs),
-                                 "covered80": metrics.covered(float(future[s]), lo, hi)})
+                                 "covered80": bool(metrics.covered(float(future[s]), lo, hi))})
     return summarize(rows, engines, dict(timing))
 
 
@@ -92,7 +92,7 @@ def summarize(rows: list[dict], engines: list[str], timing: dict, reference: str
             cov = summary[name]["coverage80"]
             verdicts[name] = {"series": len(gains), "mase_gain_vs_ets": float(np.mean(gains)) if gains else None,
                               "ci95": [lo, hi],
-                              "pass": bool(gains) and np.mean(gains) >= 0.05 and lo > 0 and 0.70 <= cov <= 0.90}
+                              "pass": bool(gains and np.mean(gains) >= 0.05 and lo > 0 and 0.70 <= cov <= 0.90)}
     return {"kind": REPORT_KIND, "summary": summary, "verdict_vs_ets": verdicts, "rows": rows}
 
 
@@ -115,7 +115,7 @@ def main(argv=None) -> None:
     report = run(load_csv(a.csv), a.engines.split(","), a.origins.split(","),
                  [int(h) for h in a.horizons.split(",")], a.season)
     with open(a.out, "w", encoding="utf-8") as f:
-        json.dump(report, f, ensure_ascii=False, indent=1)
+        json.dump(report, f, ensure_ascii=False, indent=1, default=float)
     print(json.dumps({"summary": report["summary"], "verdict_vs_ets": report["verdict_vs_ets"]},
                      ensure_ascii=False, indent=1))
 

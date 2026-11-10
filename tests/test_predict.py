@@ -69,6 +69,7 @@ def test_e1_runs_and_judges_against_ets_reference():
     assert rep["summary"]["ets"]["forecasts"] == 3 * 2 * 2
     assert "seasonal_naive" in rep["verdict_vs_ets"]
     assert rep["kind"] == e1.REPORT_KIND
+    json.dumps(rep)  # the report must be serializable without a custom encoder
 
 
 # ---------- physics engine ----------
