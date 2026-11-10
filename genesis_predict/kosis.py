@@ -116,10 +116,12 @@ def main(argv=None) -> None:
             try:
                 got = to_series(fetch_table(key, t["org"], t["tbl"], a.start, a.end, levels))
                 log.append({"table": t["tbl"], "note": t.get("note", ""), "levels": levels, "series": len(got)})
+                print(f"ok   {t['tbl']} levels={levels} series={len(got)}", flush=True)
                 break
             except Exception as exc:  # wrong level count, unknown table, network
                 err = str(exc).replace(key, "***")
         if got is None:
+            print(f"fail {t['tbl']}: {err[:120]}", flush=True)
             log.append({"table": t["tbl"], "note": t.get("note", ""), "error": err})
             continue
         series.update(got)
