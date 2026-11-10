@@ -36,22 +36,39 @@ def _months(start: str, end: str) -> list[str]:
 
 def fetch_table(api_key: str, org_id: str, tbl_id: str, start: str, end: str, levels: int = 1,
                 opener=urllib.request.urlopen, pause: float = 0.3) -> list[dict]:
-    """All cells of one table, fetched year by year. Raises RuntimeError on a KOSIS error."""
-    rows = []
-    for year in range(int(start[:4]), int(end[:4]) + 1):
-        a = max(start, f"{year}01")
-        b = min(end, f"{year}12")
+    """All cells of one table: the whole window in one call, year by year if KOSIS refuses that
+    (e.g. the 40,000-cell limit). Connection drops are retried. Raises RuntimeError on a KOSIS error."""
+
+    def get(a: str, b: str):
         params = {"method": "getList", "apiKey": api_key, "orgId": org_id, "tblId": tbl_id,
                   "itmId": "ALL", "prdSe": "M", "startPrdDe": a, "endPrdDe": b,
                   "format": "json", "jsonVD": "Y"}
         for i in range(1, levels + 1):
             params[f"objL{i}"] = "ALL"
-        with opener(URL + "?" + urllib.parse.urlencode(params), timeout=30) as r:
-            data = json.loads(r.read().decode("utf-8"))
-        if isinstance(data, dict):
-            raise RuntimeError(f"{org_id}/{tbl_id} {a}-{b}: {data.get('err')} {data.get('errMsg')}")
-        rows.extend(data)
+        for attempt in range(4):
+            try:
+                with opener(URL + "?" + urllib.parse.urlencode(params), timeout=60) as r:
+                    data = json.loads(r.read().decode("utf-8"))
+                break
+            except (OSError, json.JSONDecodeError) as exc:  # reset, timeout, truncated body
+                if attempt == 3:
+                    raise RuntimeError(f"{org_id}/{tbl_id} {a}-{b}: {type(exc).__name__}") from None
+                time.sleep(pause + 2 ** attempt)
         time.sleep(pause)
+        if isinstance(data, dict):
+            if str(data.get("err")) == "30":       # no data in this window
+                return []
+            raise RuntimeError(f"{org_id}/{tbl_id} {a}-{b}: {data.get('err')} {data.get('errMsg')}")
+        return data
+
+    try:
+        return get(start, end)
+    except RuntimeError as exc:
+        if " 21 " in str(exc):                    # wrong variables: chunking will not help
+            raise
+    rows = []
+    for year in range(int(start[:4]), int(end[:4]) + 1):
+        rows.extend(get(max(start, f"{year}01"), min(end, f"{year}12")))
     return rows
 
 
@@ -133,7 +150,7 @@ def main(argv=None) -> None:
     tables = json.load(open(a.tables, encoding="utf-8"))
     series, log = {}, []
     for t in tables:
-        got = None
+        got, errs = None, []
         for levels in ([t["levels"]] if "levels" in t else [1, 2, 3]):
             try:
                 got = to_series(fetch_table(key, t["org"], t["tbl"], a.start, a.end, levels))
@@ -141,10 +158,10 @@ def main(argv=None) -> None:
                 print(f"ok   {t['tbl']} levels={levels} series={len(got)}", flush=True)
                 break
             except Exception as exc:  # wrong level count, unknown table, network
-                err = str(exc).replace(key, "***")
+                errs.append(f"L{levels}: " + str(exc).replace(key, "***"))
         if got is None:
-            print(f"fail {t['tbl']}: {err[:120]}", flush=True)
-            log.append({"table": t["tbl"], "note": t.get("note", ""), "error": err})
+            print(f"fail {t['tbl']}: {' | '.join(e[:90] for e in errs)}", flush=True)
+            log.append({"table": t["tbl"], "note": t.get("note", ""), "error": errs})
             continue
         series.update(got)
     ids = select(series, a.start, a.end, a.per_table)[: a.target]

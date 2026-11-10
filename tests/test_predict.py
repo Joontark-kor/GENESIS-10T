@@ -189,3 +189,17 @@ def test_kosis_error_is_raised_without_key():
     with pytest.raises(RuntimeError) as exc:
         kosis.fetch_table("secret", "101", "T1", "202401", "202402", opener=opener, pause=0)
     assert "secret" not in str(exc.value)
+
+
+def test_kosis_retries_connection_reset():
+    import io
+    from genesis_predict import kosis
+    calls = {"n": 0}
+
+    def opener(url, timeout=60):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ConnectionResetError(104, "reset")
+        return io.BytesIO(json.dumps([{"ORG_ID": "1", "TBL_ID": "T", "ITM_ID": "I", "PRD_DE": "202401", "DT": "1"}]).encode())
+    assert len(kosis.fetch_table("k", "1", "T", "202401", "202401", opener=opener, pause=0)) == 1
+    assert calls["n"] == 2
