@@ -32,6 +32,7 @@ An open base model + the GENESIS core (see [11_core_ko.md](11_core_ko.md)) + dom
 - [x] Baseline vs fin-v1 on the held-out companies (Qwen3-4B: base 85.3%, QLoRA 84.0%, base + polarbear 98.7%; 544 items, one run). 8B skipped: the error was arithmetic, not model size
 
 ### A3: deeper Korean tasks and public release [NEXT]
+- [x] Terminal demo (4-a): `python -m genesis_fin.demo` answers a ratio question about one filing with value, formula, source link and a recomputation check; tested with a fake model (docs/10). Not yet run on real questions (needs an endpoint and records or a DART key)
 - [ ] Harder tasks: multi-year trends, consolidated vs separate statements, peer comparison within an industry, numbers stated in filing text
 - [ ] Public benchmarks alongside: KMMLU Accounting / Taxation / Economics / Management / Real-Estate, KRX-Bench
 - [ ] Hugging Face release: adapter, model card, evaluation report, data card

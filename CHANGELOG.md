@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `genesis_fin.demo`: terminal demo for 4-a. One ratio question about one listed company's filing returns the value, the formula, the filing link and a recomputation check; out-of-scope questions are refused instead of sent to the model. Tested with a fake model only (+6 tests).
+
 ## 0.3.0 - 2026-11-11
 
 Scope of polarbear in this release (decision 2026-11-11, docs/12 last section): a tool for **structured calculation questions where the values are given** (finance ratios, everyday numbers, structured multi-step), called where the app knows the question is a calculation (`CalcClient`, `--pipeline polarbear`). It is not a default wrapper for every question: on prose math word problems (Korean GSM8K, 1319 items: 64.1% -> 59.7%) and on no-calculation questions (85.1% -> 79.2%) it is below baseline. No new option was added for that; reopen only if the DART demo shows the failure repeatedly.

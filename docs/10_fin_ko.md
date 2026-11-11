@@ -122,3 +122,22 @@ python -m genesis.harness.evaluate run --endpoint http://localhost:8000/v1 --mod
 2. 공개 벤치마크 병행: KMMLU 회계·세무·경제·경영·부동산 과목, KRX-Bench
 3. Hugging Face에 어댑터, 모델 카드, 평가 보고서 공개
 4. (선택, 나중에) 일본 EDINET 수집과 일본어 과제
+
+## 터미널 데모 (4-a, 2026-11-11)
+
+공시 한 건에 대해 계산 질문을 하면 값, 식, 출처, 검산을 함께 보여 준다. 코드는 `genesis_fin/demo.py`.
+
+```bash
+# 이미 수집한 기록으로(오프라인)
+python -m genesis_fin.demo --records data/applied/fin_v1/records.jsonl \
+    --endpoint http://localhost:8000/v1 --model Qwen/Qwen3-4B "삼성전자 2024년 부채비율은?"
+# DART_API_KEY가 있으면 공시를 바로 가져온다(연도를 질문에 적어야 한다)
+python -m genesis_fin.demo --endpoint http://localhost:8000/v1 --model fin "삼성전자 2024년 영업이익률은?"
+```
+
+- 물을 수 있는 것: 영업이익률, 순이익률, 부채비율, 자기자본비율, ROE, 매출 증가율. 그 밖의 질문은 모델에 보내지 않고 범위 밖이라고 답한다(폴라베어 적용 범위 결정, docs/12).
+- 출력: `출처`(접수번호와 DART 공시 링크), `식`(모델이 쓴 식), `답`(계산기가 계산한 값), `검산`, `확인할 점`.
+- 검산: 같은 표의 숫자로 코드가 다시 계산한 값과 모델 답이 0.01 안에서 같으면 통과, 다르면 "이 답은 쓰지 마세요"라고 표시한다. 모델 답을 고쳐 쓰지는 않는다.
+- 한계: 이 검산은 "표의 숫자로 계산이 맞는가"이지 "표가 공시 원문과 같은가"가 아니다. 원문 대조(표의 숫자를 공시 본문과 맞춰 보기)는 A3의 남은 과제다.
+- 시험은 가짜 모델로 한다(`tests/test_fin_demo.py`). 실제 모델로 몇 개 질문에 돌려 보는 것은 엔드포인트(GPU)와 수집된 기록 또는 DART 키가 있어야 한다.
+
