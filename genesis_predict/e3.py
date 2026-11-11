@@ -39,6 +39,34 @@ def parse_answer(text: str) -> float | None:
         return None
 
 
+def extract_spec(text: str) -> dict | None:
+    """Spec after the LAST '시나리오' marker: first balanced {...}; JSON, then Python-literal syntax
+    (single quotes, True/None). Code fences are ignored. Formats only - no guessing of content."""
+    import ast
+
+    t = (text or "").replace("```json", "").replace("```", "")
+    k = t.rfind("시나리오")
+    if k < 0:
+        return None
+    start = t.find("{", k)
+    if start < 0:
+        return None
+    depth = 0
+    for i in range(start, len(t)):
+        depth += t[i] == "{"
+        depth -= t[i] == "}"
+        if depth == 0:
+            body = t[start:i + 1]
+            for load in (json.loads, ast.literal_eval):
+                try:
+                    out = load(body)
+                    return out if isinstance(out, dict) else None
+                except Exception:
+                    continue
+            return None
+    return None  # unbalanced: the reply was cut off
+
+
 def normalize_spec(spec: dict | None) -> dict | None:
     """Light, rule-based cleanup of unit spellings a model commonly writes (not a second model)."""
     if not isinstance(spec, dict):
@@ -103,7 +131,7 @@ def score(items: list[dict], direct_out: list[str], spec_out: list[str]) -> dict
     rows = []
     for it, dtext, stext in zip(items, direct_out, spec_out):
         unsup = bool(UNSUP_RE.search(stext or ""))
-        spec = None if unsup else normalize_spec(physics.extract_spec(stext))
+        spec = None if unsup else normalize_spec(extract_spec(stext))
         d_ans, s_ans = parse_answer(dtext), parse_answer(stext)
         eng_val = None
         if spec:

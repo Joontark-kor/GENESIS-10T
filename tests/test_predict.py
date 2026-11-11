@@ -295,3 +295,12 @@ def test_e2_build_score_without_gpu():
     assert rep["pass_engine_helps_llm"] is True
     json.dumps(rep)
     assert e2.parse("... 예측: 1,234.5, 1,200, 1,300") == {"median": 1234.5, "p10": 1200.0, "p90": 1300.0}
+
+
+def test_e3_extract_spec_lenient():
+    from genesis_predict import e3
+    a = e3.extract_spec("풀이...\n시나리오: ```json\n{\"template\": \"ohm\", \"params\": {\"V\": \"12 V\", \"R\": \"4 ohm\"}, \"ask\": \"power\", \"unit\": \"W\"}\n```\n정답: 36")
+    assert a["template"] == "ohm"
+    b = e3.extract_spec("시나리오: {'template': 'ohm', 'params': {'V': '12 V', 'R': '4 ohm'}, 'ask': 'current', 'unit': 'A'}")
+    assert b["ask"] == "current"
+    assert e3.extract_spec("시나리오: {\"template\": \"ohm\", \"params\": {\"V\": ") is None
