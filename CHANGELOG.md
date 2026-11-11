@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.3.0 - 2026-11-11 (prepared; the owner tags the release)
+## 0.3.0 - 2026-11-11
 
 Scope of polarbear in this release (decision 2026-11-11, docs/12 last section): a tool for **structured calculation questions where the values are given** (finance ratios, everyday numbers, structured multi-step), called where the app knows the question is a calculation (`CalcClient`, `--pipeline polarbear`). It is not a default wrapper for every question: on prose math word problems (Korean GSM8K, 1319 items: 64.1% -> 59.7%) and on no-calculation questions (85.1% -> 79.2%) it is below baseline. No new option was added for that; reopen only if the DART demo shows the failure repeatedly.
 
