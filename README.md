@@ -1,99 +1,57 @@
 # GENESIS-10T
 
-> Research ambition: a 10-trillion-parameter sparse Mixture-of-Experts foundation model.
+> GENESIS is a three-layer base for Korean-first applied LLM work: an **open base model** (currently Qwen3-4B), the **GENESIS core** (LoRA/QLoRA adapters, one evaluation-report format, an OpenAI-compatible serving contract, a safety-check interface, and the **polarbear** tool layer) and **domain applications** (the first is Korean corporate finance from OpenDART filings).
 >
-> **Near-term target: GENESIS-1B-KO** — a ~1B-parameter Korean-first model trained from scratch on data whose license is tracked per document, released with its data card, tokenizer and reproduction scripts.
->
-> **Practical track: GENESIS core + domain adapters** — an open base model, the GENESIS core (data, LoRA/QLoRA, one evaluation-report format, an OpenAI-compatible serving contract, a safety-check interface) and per-domain adapters. The first domain is `genesis_fin`: Korean corporate-finance analysis on OpenDART filings, published with accuracy, cost and speed. See [docs/11_core_ko.md](docs/11_core_ko.md) and [docs/10_fin_ko.md](docs/10_fin_ko.md).
->
-> **Actually implemented:** the full small-scale pipeline (data registry → cleaning → Korean BPE → token shards → dense/MoE training with DDP → evaluation). No large model has been trained yet.
+> **Scope since 2026-11-11:** this repository is Track A only. The from-scratch pretraining research (Track B: data pipeline, tokenizer, Transformer/MoE, scaling ladder) moved to the separate repository **ssial**; the two do not import each other, and the earlier history of those files stays here (up to `v0.3.0`).
 
-## Objective
+## What is measured
 
-Build the engineering capability to train a language model from **legally usable raw data**, with provenance, a tokenizer, a causally masked Transformer, sparse top-k expert routing, pretraining, evaluation and eventual scale-out.
+Polarbear: the model writes a formula (`계산식:`), `genesis.tools` calculates. It is a tool for **structured calculation questions whose values are given** (finance ratios, everyday numbers, structured multi-step). Measured on Qwen3-4B, Colab T4, with ranges over seeds 1-5 and public sets (details, mistakes and decisions: [docs/12_polarbear_ko.md](docs/12_polarbear_ko.md)):
 
-10T describes **total** parameters, not activated parameters. Scaling requires measured quality, safety, training throughput, distributed expertise, a team, significant financing and GPU infrastructure. Larger size alone is not a useful quality metric.
+| Set | Baseline | Polarbear |
+| --- | --- | --- |
+| Finance (544 items, one run) | 85.3% | 98.7% |
+| Multi-step (240, seeds 1-5) | 78.7% | 88.8% |
+| Everyday numbers (420, seeds 1-5) | 93.1% | 97.0% |
+| No-calculation questions (240, seeds 1-5) | 85.1% | 79.2% (lower; call it only on calculation questions) |
+| Korean GSM8K, full (1319, one run) | 64.1% | 59.7% (lower) |
+
+Fine-tuning (QLoRA) did not help on the finance set (84.0%): the errors were the model's own arithmetic.
 
 ## Quick start (CPU is enough)
 
-Requires Python 3.10+ and PyTorch. Prefer Linux/WSL2 for GPU/distributed work.
+Requires Python 3.10+.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate            # Windows PowerShell: .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 python -m pytest -q
-
-python -m genesis.prepare --input data/raw --output data/processed \
-    --source self-authored-demo --license self-authored
-python -m genesis.train --config configs/debug.json --data data/processed \
-    --out-dir checkpoints/debug --steps 25 --eval-every 5
-python -m genesis.generate --checkpoint checkpoints/debug/model.pt --prompt "인공지능은" --tokens 60
 ```
 
-The demo corpus is tiny, so generation is nonsense; the point is that every stage runs and is tested.
+GPU work (Colab T4 is enough for the 4B model): `pip install -e ".[fin,qlora]"`, then the notebooks and `scripts/colab_*.sh`.
 
-## The real pipeline
+## Guides
 
-Guides (Korean): [data → training](docs/02_pipeline_ko.md) · [next steps](docs/03_next_steps_ko.md) · [benchmarks](docs/04_benchmarks_ko.md) · [instruction tuning](docs/05_sft_ko.md) · [core contract](docs/11_core_ko.md) · [genesis-fin](docs/10_fin_ko.md).
-
-```bash
-# A. sources -> normalized, filtered, PII-masked, deduplicated, split text (+ DATA_CARD.md)
-python -m genesis.data.clean --sources configs/sources.json --output data/clean/v1
-# B. Korean-first byte-level BPE, trained on the train split only
-python -m genesis.train_tokenizer --input data/clean/v1 --vocab-size 32768 --output tokenizers/ko32k-v1.json
-# C. token shards pinned to the tokenizer hash
-python -m genesis.data.tokenize --input data/clean/v1 --tokenizer tokenizers/ko32k-v1.json --output data/tokens/ko32k-v1
-# D. train (single GPU, or torchrun for multi-GPU)
-python -m genesis.train --config configs/dense-100m.json --data data/tokens/ko32k-v1 \
-    --out-dir checkpoints/dense-100m --batch-size 16 --grad-accum 4 --steps 15000 --save-every 1000
-# E. evaluate and check benchmark contamination
-python -m genesis.evaluate --checkpoint checkpoints/dense-100m/model.pt --data data/tokens/ko32k-v1 --split val
-python -m genesis.contamination --train data/clean/v1 --benchmark bench.jsonl --fields question
-```
+[Core contract](docs/11_core_ko.md) · [finance application and terminal demo](docs/10_fin_ko.md) · [polarbear measurements](docs/12_polarbear_ko.md) · [prediction engine (research, off by default)](docs/13_predict_ko.md) · [roadmap](docs/roadmap.md)
 
 ## Components
 
 | Path | Purpose |
 | --- | --- |
-| `genesis/text.py` | NFC normalization (fixes decomposed Hangul), script ratios |
-| `genesis/data/sources.py` | Source registry; refuses sources without license and rights basis |
-| `genesis/data/filters.py`, `pii.py`, `dedup.py` | Quality heuristics with reasons, Korean PII masking, exact + MinHash dedup |
-| `genesis/data/clean.py` | Stage A: clean text, content-hash splits, `DATA_CARD.md` |
-| `genesis/tokenizer.py`, `train_tokenizer.py`, `tokenizer_report.py` | Byte and BPE tokenizers, training, tokens-per-syllable report |
-| `genesis/data/tokenize.py`, `shards.py` | Stage C: sharded uint16/uint32 token files and reader |
-| `genesis/model.py` | RMSNorm, RoPE, GQA attention (SDPA), dense SwiGLU or top-k MoE |
-| `genesis/train.py` | LR schedule, grad accumulation, BF16, DDP, exact resume, bpb, MFU |
-| `genesis/evaluate.py`, `contamination.py` | Held-out loss/bpb; benchmark n-gram contamination + blocklist |
-| `genesis/estimate.py` | Exact parameter counts, training FLOPs and GPU-hours |
-| `genesis/export_hf.py` | Dense checkpoint → Hugging Face Llama folder (+ chat template), verified logit-for-logit |
-| `genesis/bench_to_jsonl.py` | KoBEST / HAE-RAE / CLIcK / KMMLU items for contamination checks |
-| `genesis/ladder.py` | Scaling-ladder run plan, power-law fit, plot, prediction |
-| `genesis/chat.py`, `genesis/data/sft.py` | Chat format and instruction-tuning data with assistant-only loss |
 | `genesis/adapt/` | LoRA/QLoRA fine-tuning of an open base model on chat data (assistant-only loss), `run.json` provenance |
-| `genesis/harness/` | One evaluation-report format for every model/adapter: accuracy, speed, cost, contamination; local or served models |
-| `genesis/serving/` | OpenAI-compatible endpoint client and vLLM multi-LoRA command; apps call the endpoint, not model code |
-| `genesis/safety.py` | Safety-check interface only (input/output verdicts, loader, guarded call); implementations live with each application |
-| `genesis_fin/` | Domain package: OpenDART client and financial tasks with computed answers. Depends on `genesis`; never the reverse |
-| `configs/` | `debug`, `ko-tiny-cpu`, `dense-40m`, `dense-100m`, `moe-8x-100m-active`, `dense-300m`, `dense-1b`, `sources.example.json` |
+| `genesis/harness/` | One evaluation-report format for every model/adapter: accuracy, speed, cost, contamination; local or served models; the polarbear pipeline and scorers |
+| `genesis/serving/` | OpenAI-compatible endpoint client, vLLM multi-LoRA command, `CalcClient`, a test-only transformers server |
+| `genesis/tools.py` | The calculator the model's formulas go through |
+| `genesis/safety.py` | Safety-check interface only; implementations live with each application |
+| `genesis/hubsync.py`, `precision.py`, `util.py` | Private Hugging Face sync for Colab, bf16/fp16 choice, small shared helpers |
+| `genesis_fin/` | Domain package: OpenDART client, financial tasks with computed answers, the terminal demo. Depends on `genesis`; never the reverse |
+| `genesis_calc/` | Everyday-number task generators and the external benchmark loaders (evaluation only) |
+| `genesis_predict/` | Prediction-engine research track (off by default) |
+| `notebooks/`, `scripts/` | Colab runbooks and run scripts |
 
 ## Data governance
 
-Use only datasets you own or whose terms permit the intended training and redistribution. The registry makes you record license, rights basis and commercial-use status for every source, and the data card reports what was kept and removed. **The pipeline cannot verify that what you record is true.** Regex PII masking misses names, addresses and account numbers. Get legal review before any commercial release.
-
-## Important boundaries
-
-- No FSDP/tensor/pipeline/expert parallelism yet: DDP only, so models must fit on one GPU (≈ up to 1B on 80 GB).
-- MoE routing is a single-device loop, correct but not fast.
-- MoE checkpoints cannot be exported to Hugging Face yet; no preference tuning (DPO) or safety evaluation yet.
-- The core defines the safety-check interface but ships no screening rules; an application without its own check runs with `AllowAll`, which reports that no check ran.
-- Never infer quality from parameter count alone; verify against held-out benchmarks.
+Use only datasets you own or whose terms permit the intended use. External benchmarks (KMMLU, Korean GSM8K) are downloaded at run time for evaluation only and are never committed or redistributed.
 
 License for **code**: MIT. Dataset licensing must be evaluated separately.
-
-## 10T parameter arithmetic without allocating a model
-
-```bash
-python -m genesis.estimate --config configs/dense-1b.json --tokens 3e10   # size + GPU-hours
-python -m genesis.estimate --hypothetical-10t
-```

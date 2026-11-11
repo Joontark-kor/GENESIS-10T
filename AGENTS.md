@@ -4,7 +4,7 @@ Guide for coding agents (Codex, Claude Code, etc.). Read this first, then `docs/
 
 ## What this repo is
 
-GENESIS is a three-layer base for the owner's work: (1) base weights (open model, currently Qwen3-4B; research track: own pretraining), (2) **GENESIS core**, (3) applications (domain LoRA adapters). The standard is a **convention**, not weights:
+GENESIS is a three-layer base for the owner's work: (1) base weights (open model, currently Qwen3-4B; own pretraining research moved to the separate `ssial` repository on 2026-11-11), (2) **GENESIS core**, (3) applications (domain LoRA adapters). The standard is a **convention**, not weights:
 
 - apps call only an **OpenAI-compatible endpoint**; they never import training code,
 - one **evaluation-report format** (`REPORT_VERSION = 1`) for every adapter,
@@ -21,14 +21,14 @@ GENESIS is a three-layer base for the owner's work: (1) base weights (open model
 | `genesis/safety.py` | `SafetyCheck` protocol, `AllowAll`, `guarded_chat` (interface only) |
 | `genesis/precision.py` | bf16 on CUDA capability >= 8, fp16 on T4, fp32 on CPU |
 | `genesis_fin/` | first application: OpenDART finance tasks (depends on core, never the reverse) |
-| other `genesis/*` | small-scale pretraining pipeline (research track) |
+| `genesis/util.py`, `genesis/hubsync.py` | shared helpers (`file_sha256`, `assign_split`), private Hugging Face sync |
 | `notebooks/fin_colab.ipynb` | Colab runbook: baseline -> QLoRA -> compare |
 
 Data paths (`data/applied/fin_v1`, `runs/applied`, `reports/applied`) are kept for cache compatibility.
 
 ## Hard rules (boundaries)
 
-1. **Dependency direction is one way:** core -> `genesis_fin`/private repos. Core must not import `genesis_fin` (enforced by `tests/test_boundaries.py`).
+1. **Dependency direction is one way:** core -> `genesis_fin`/private repos. Core must not import `genesis_fin`, and nothing here imports `ssial` (the pretraining repo); both enforced by `tests/test_boundaries.py`.
 2. **This repo is public.** Never add: company internal data, company names or code, secrets/tokens, or anything about the owner's private *companion* project (safety-pipeline implementations, conversation design, patent candidates). If you see such content, stop and tell the owner.
 3. **No new GPU training runs, large downloads, or data additions without the owner's go-ahead.** Document first, then ask.
 4. **Never push to `main` directly.** Open a PR; the owner merges (routine PRs may be merged after tests pass if the owner has said so in the current session). The `v0.2.0`/`v0.3.0` tags are created by the owner through GitHub Releases.
@@ -39,7 +39,7 @@ Data paths (`data/applied/fin_v1`, `runs/applied`, `reports/applied`) are kept f
 ```bash
 pip install -e ".[dev]"          # core + tests
 pip install -e ".[fin,qlora]"    # finance task building + QLoRA (GPU machines)
-python -m pytest -q              # 143 passed, 3 skipped (no GPU needed)
+python -m pytest -q              # 84 passed, 1 skipped (no GPU needed; needs transformers+peft for the adapter smoke test)
 ```
 
 ## Conventions
@@ -51,7 +51,9 @@ python -m pytest -q              # 143 passed, 3 skipped (no GPU needed)
 - Owner's standing request (2026-11-07): use the latest techniques, papers and sites, coding practice included. Before choosing a method or library, check current sources (web search) instead of relying on memory, and cite what you used.
 - Talk to the owner in Korean, briefly and concretely; no jargon dumps.
 
-## Current state (2026-11-08, verify against `git log` and `docs/roadmap.md`)
+## Current state (2026-11-11, verify against `git log` and `docs/roadmap.md`)
+
+- **2026-11-11 scope change (owner decision): Track B (from-scratch pretraining) moved to the separate private repository `ssial`; this repo is Track A only.** Moved: `genesis/{model,train,tokenizer,train_tokenizer,tokenizer_report,config,chat,estimate,ladder,prepare,text,generate,evaluate,export_hf,contamination,bench_to_jsonl}.py`, `genesis/data/`, `configs/`, `tokenizers/`, `data/`, docs 00-05 and `architecture.md`, and their tests. History before the split stays here (tag `v0.3.0` contains everything). `file_sha256` and `assign_split` now live in `genesis/util.py`. Do not re-add pretraining code here.
 
 - main: structure v0.2.0 merged (PRs #6-#10), polarbear pipeline and checks (#11-#14), second-domain eval set (#15), Drive-free Colab with private Hugging Face sync (#16/#17, brought into main by #18). `v0.2.0` tag and release published (2026-11-03). `v0.3.0` tag and release published (2026-11-11, on ad431e7; version bump, CHANGELOG 0.3.0, polarbear scope note in docs/11; 141 tests pass, 4 skipped).
 - fin-v1 (Qwen3-4B, 544 test items): baseline **85.3%**; first QLoRA **84.0%** (no gain: errors are the model's own arithmetic, not finance knowledge); **polarbear pipeline** (model writes the formula, `genesis.tools` calculates) **98.7%**. Multi-step set (`--set multi`, 240 items): baseline 78.3% → polarbear **92.1%**; `--multistep` hurt (64.2%) and `--prose-retry` did not help (90.4% vs 92.1%), so both stay off (docs/12). Guard set with nothing to calculate (`--set lookup`, 240 items, one run): baseline 85.8% -> polarbear **81.2%** (it makes replies terse), `--lookup-hint` 77.1%; polarbear is for questions that need a calculation (docs/12). `--route` (opt-in, built 2026-11-08; no digits in the question -> plain path): lookup 86.2% (restores baseline), multi 90.4% vs 92.1% (noise), ~2x time per item; use it when no-calculation questions are mixed in (docs/12). Multi-step misses: `trip_time` errors are a missing minutes conversion (`* 60`), not a dropped step; `--unit-hint` 91.2% vs 92.1% (no gain); the 'question numbers unused in formula' signal fails (too many false alarms) (docs/12). fin-v1 is **frozen** as base model + polarbear pipeline; no further fin GPU training.

@@ -11,9 +11,30 @@ from genesis.adapt.chatdata import encode_example
 from genesis.harness.evaluate import main as eval_main
 from genesis.harness.scorers import is_correct, parse_number
 from genesis.adapt.finetune import main as finetune_main
-from genesis.chat import HF_CHAT_TEMPLATE
-from genesis.tokenizer import train_bpe
 from tests.test_fin_tasks import SAMSUNG_LIKE, _record
+
+# a ChatML-style template and a tiny byte-level BPE built here, so the test needs only `tokenizers`
+HF_CHAT_TEMPLATE = (
+    "{% for message in messages %}"
+    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>' + '\\n' }}"
+    "{% endfor %}"
+    "{% if add_generation_prompt %}{{ '<|im_start|>assistant\\n' }}{% endif %}"
+)
+SPECIAL_TOKENS = ["<|pad|>", "<|bos|>", "<|eos|>", "<|im_start|>", "<|im_end|>"]
+
+
+def train_bpe(texts, vocab_size, output, show_progress=False):
+    from tokenizers import Tokenizer, decoders, models, normalizers, pre_tokenizers, trainers
+
+    tok = Tokenizer(models.BPE())
+    tok.normalizer = normalizers.NFC()
+    tok.pre_tokenizer = pre_tokenizers.Sequence([
+        pre_tokenizers.Digits(individual_digits=True), pre_tokenizers.ByteLevel(add_prefix_space=False)])
+    tok.decoder = decoders.ByteLevel()
+    trainer = trainers.BpeTrainer(vocab_size=vocab_size, min_frequency=2, special_tokens=SPECIAL_TOKENS,
+                                  initial_alphabet=pre_tokenizers.ByteLevel.alphabet(), show_progress=show_progress)
+    tok.train_from_iterator(texts, trainer=trainer)
+    tok.save(str(output))
 
 
 def test_parse_number_prefers_tagged_answer():

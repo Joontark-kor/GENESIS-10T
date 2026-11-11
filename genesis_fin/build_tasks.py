@@ -25,8 +25,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from genesis.data.clean import assign_split
-from genesis.tokenizer import file_sha256
+from genesis.util import assign_split
+from genesis.util import file_sha256
 from .dart import DartClient, QuotaExceeded
 
 # Special purpose acquisition companies have no operating business to analyse.

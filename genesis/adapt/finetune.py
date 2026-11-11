@@ -23,7 +23,7 @@ from pathlib import Path
 import time
 
 from ..precision import describe, native_bf16
-from ..tokenizer import file_sha256
+from ..util import file_sha256
 from .chatdata import Collator, encode_example, load_jsonl
 
 

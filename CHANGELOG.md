@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Track B (from-scratch pretraining) moved to the separate `ssial` repository.** This repository is Track A only. Removed: the pretraining modules, `genesis/data/`, `configs/`, `tokenizers/`, `data/`, docs 00-05 and `architecture.md`, and their tests. `file_sha256` and `assign_split` moved to `genesis/util.py`. New boundary tests: nothing imports `ssial`; the pretraining modules stay gone. History before this change (up to `v0.3.0`) is unchanged.
+
+## Unreleased
+
 - `genesis_fin.demo`: terminal demo for 4-a. One ratio question about one listed company's filing returns the value, the formula, the filing link and a recomputation check; out-of-scope questions are refused instead of sent to the model. Tested with a fake model only (+6 tests).
 
 ## 0.3.0 - 2026-11-11

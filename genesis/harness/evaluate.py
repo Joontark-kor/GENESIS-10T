@@ -37,7 +37,7 @@ from genesis import __version__ as GENESIS_VERSION
 from genesis.adapt.chatdata import load_jsonl, render
 from genesis.harness.scorers import is_correct, parse_number, resolve  # noqa: F401  (re-exported)
 from genesis.precision import describe, inference_dtype
-from genesis.tokenizer import file_sha256
+from genesis.util import file_sha256
 
 REPORT_VERSION = 1
 
