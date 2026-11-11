@@ -1,0 +1,172 @@
+{
+ "kind": "genesis_predict.e1/v1",
+ "run": "2026-11-11, Colab CPU (2 vCPU), commit 4b4c513",
+ "data": {
+  "source": "KOSIS OpenAPI",
+  "window": "2015-01..2025-10",
+  "series": 53,
+  "rule": "complete 201501-202510, non-constant, sha256 order of id, <= 12 per table (target 60; 53 eligible)",
+  "series_csv_sha256": "8c769a26bb792de8cf69793131ca0abac04687deff2f4eb32330d3379a48882c",
+  "series_ids": [
+   "101|DT_1DA7001S|5|T50",
+   "101|DT_1DA7001S|0|T40",
+   "101|DT_1DA7001S|7|T10",
+   "101|DT_1DA7001S|5|T60",
+   "101|DT_1DA7001S|2|T80",
+   "101|DT_1DA7001S|9|T50",
+   "101|DT_1DA7001S|8|T40",
+   "101|DT_1DA7001S|6|T60",
+   "101|DT_1DA7001S|4|T10",
+   "101|DT_1DA7001S|6|T90",
+   "101|DT_1DA7001S|6|T10",
+   "101|DT_1DA7001S|6|T20",
+   "101|DT_1DA7002S|60|T20",
+   "101|DT_1DA7002S|702|T90",
+   "101|DT_1DA7002S|401|T30",
+   "101|DT_1DA7002S|402|T90",
+   "101|DT_1DA7002S|402|T60",
+   "101|DT_1DA7002S|50|T20",
+   "101|DT_1DA7002S|701|T30",
+   "101|DT_1DA7002S|302|T60",
+   "101|DT_1DA7002S|401|T90",
+   "101|DT_1DA7002S|30|T80",
+   "101|DT_1DA7002S|202|T60",
+   "101|DT_1DA7002S|40|T10",
+   "101|DT_1J22003|T10|T",
+   "101|DT_1J22003|T96|T",
+   "101|DT_1J22003|T90|T",
+   "101|DT_1J22003|T15|T",
+   "101|DT_1J22003|T31|T",
+   "101|DT_1J22003|T17|T",
+   "101|DT_1J22003|T41|T",
+   "101|DT_1J22003|T21|T",
+   "101|DT_1J22003|T81|T",
+   "101|DT_1J22003|T61|T",
+   "101|DT_1J22003|T11|T",
+   "101|DT_1J22003|T71|T",
+   "101|DT_1JH20201|1E|T1",
+   "101|DT_1JH20201|1C|T1",
+   "101|DT_1JH20201|1D|T1",
+   "101|DT_1JH20201|0|T1",
+   "101|DT_1JH20201|1B|T1",
+   "101|DT_1K41012|G35|T2",
+   "101|DT_1K41012|G22|T3",
+   "101|DT_1K41012|G0|T1",
+   "101|DT_1K41012|G23|T1",
+   "101|DT_1K41012|G19|T1",
+   "101|DT_1K41012|G33|T1",
+   "101|DT_1K41012|G39|T2",
+   "101|DT_1K41012|G21|T2",
+   "101|DT_1K41012|G111|T1",
+   "101|DT_1K41012|G32|T1",
+   "101|DT_1K41012|G131|T1",
+   "101|DT_1K41012|G2|T1"
+  ],
+  "tables_failed": {
+   "DT_1J22001": "cell limit / wrong levels",
+   "DT_1F01501": "table not found",
+   "DT_1KS2015": "table not found",
+   "DT_1J17112": "table not found",
+   "DT_1B8000F": "fetched, no complete series"
+  }
+ },
+ "design": {
+  "origins": [
+   "2024-01",
+   "2024-04",
+   "2024-07",
+   "2024-10",
+   "2025-01",
+   "2025-04"
+  ],
+  "horizons": [
+   1,
+   3,
+   6
+  ],
+  "forecasts_per_engine": 954
+ },
+ "summary": {
+  "seasonal_naive": {
+   "mase": 0.938,
+   "crps": 23.08,
+   "coverage80": 0.875
+  },
+  "ets": {
+   "mase": 0.475,
+   "crps": 7.74,
+   "coverage80": 0.858
+  },
+  "arima": {
+   "mase": 0.464,
+   "crps": 7.13,
+   "coverage80": 0.889
+  },
+  "chronos2_small_28m": {
+   "mase": 0.482,
+   "crps": 7.95,
+   "coverage80": 0.813
+  }
+ },
+ "verdict_vs_ets": {
+  "arima": {
+   "mase_gain": -0.011,
+   "ci95": [
+    -0.087,
+    0.063
+   ],
+   "pass": false
+  },
+  "chronos2_small_28m": {
+   "mase_gain": -0.115,
+   "ci95": [
+    -0.202,
+    -0.04
+   ],
+   "pass": false
+  },
+  "seasonal_naive": {
+   "mase_gain": -2.438,
+   "ci95": [
+    -4.37,
+    -1.26
+   ],
+   "pass": false
+  }
+ },
+ "mase_by_horizon": {
+  "1": {
+   "ets": 0.338,
+   "arima": 0.338,
+   "chronos2_small_28m": 0.377
+  },
+  "3": {
+   "ets": 0.479,
+   "arima": 0.469,
+   "chronos2_small_28m": 0.486
+  },
+  "6": {
+   "ets": 0.608,
+   "arima": 0.587,
+   "chronos2_small_28m": 0.583
+  }
+ },
+ "exploratory_not_preregistered": {
+  "chronos2_base_120m": {
+   "mase": 0.466,
+   "crps": 7.28,
+   "coverage80": 0.837,
+   "mase_gain_vs_ets": -0.04,
+   "ci95": [
+    -0.134,
+    0.032
+   ],
+   "pass": false
+  }
+ },
+ "notes": [
+  "mase_gain = mean over series of (1 - MASE_engine / MASE_ets); CI = series bootstrap",
+  "CRPS is in each series' own units, so its mean is dominated by large-scale series; MASE is the pre-registered metric",
+  "2024-2025 may overlap Chronos-2 pretraining, which favours Chronos; it still did not beat ETS"
+ ]
+}

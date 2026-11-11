@@ -69,6 +69,7 @@ def test_e1_runs_and_judges_against_ets_reference():
     assert rep["summary"]["ets"]["forecasts"] == 3 * 2 * 2
     assert "seasonal_naive" in rep["verdict_vs_ets"]
     assert rep["kind"] == e1.REPORT_KIND
+    json.dumps(rep)  # the report must be serializable without a custom encoder
 
 
 # ---------- physics engine ----------
@@ -149,3 +150,104 @@ def test_sealed_set_opens_once_and_detects_edits(tmp_path):
     data.write_text("{}\n", encoding="utf-8")
     with pytest.raises(ValueError):
         sealed.open_sealed(data, mpath, "edited")
+
+
+# ---------- KOSIS (offline, fake responses) ----------
+
+def test_kosis_fetch_select_and_csv(tmp_path):
+    import io
+    from genesis_predict import kosis
+
+    def cell(c1, itm, m, v):
+        return {"ORG_ID": "101", "TBL_ID": "T1", "TBL_NM": "표", "C1": c1, "C1_NM": c1, "ITM_ID": itm,
+                "ITM_NM": "값", "UNIT_NM": "", "PRD_DE": m, "DT": v}
+
+    def opener(url, timeout=60):
+        q = dict(x.split("=", 1) for x in url.split("?", 1)[1].split("&"))
+        rows = []
+        for m in kosis._months(q["startPrdDe"], q["endPrdDe"]):
+            rows.append(cell("A", "T", m, str(int(m[-2:]) + int(m[:4]))))   # complete, varying
+            rows.append(cell("B", "T", m, "5"))                              # constant -> dropped
+            rows.append(cell("C", "T", m, "-" if m == "202402" else "1.5"))  # gap -> dropped
+        return io.BytesIO(json.dumps(rows).encode())
+
+    rows = kosis.fetch_table("k", "101", "T1", "202311", "202403", opener=opener, pause=0)
+    assert len(rows) == 3 * 5
+    series = kosis.to_series(rows)
+    assert kosis.select(series, "202311", "202403", 10) == ["101|T1|A|T"]
+    out = tmp_path / "s.csv"
+    kosis.write_csv(series, ["101|T1|A|T"], out)
+    loaded = e1.load_csv(str(out))
+    assert [d for d, _ in loaded["101|T1|A|T"]] == ["2023-11", "2023-12", "2024-01", "2024-02", "2024-03"]
+
+
+def test_kosis_error_is_raised_without_key():
+    import io
+    from genesis_predict import kosis
+
+    def opener(url, timeout=60):
+        return io.BytesIO(json.dumps({"err": "20", "errMsg": "필수요청변수값 누락"}).encode())
+    with pytest.raises(RuntimeError) as exc:
+        kosis.fetch_table("secret", "101", "T1", "202401", "202402", opener=opener, pause=0)
+    assert "secret" not in str(exc.value)
+
+
+def test_kosis_retries_connection_reset():
+    import io
+    from genesis_predict import kosis
+    calls = {"n": 0}
+
+    def opener(url, timeout=60):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ConnectionResetError(104, "reset")
+        return io.BytesIO(json.dumps([{"ORG_ID": "1", "TBL_ID": "T", "ITM_ID": "I", "PRD_DE": "202401", "DT": "1"}]).encode())
+    assert len(kosis.fetch_table("k", "1", "T", "202401", "202401", opener=opener, pause=0)) == 1
+    assert calls["n"] == 2
+
+
+# ---------- physics dev set ----------
+
+def test_physics_set_shape_and_josa():
+    from genesis_predict import physics_set as ps
+    items = ps.make(seed=3, per_template=4, unsupported=5)
+    assert len(items) == 10 * 4 + 5
+    assert ps.josa("시간") == "시간은" and ps.josa("거리") == "거리는" and ps.josa("최고 높이(지면 기준)") == "최고 높이(지면 기준)는"
+    for it in items:
+        if it["status"] == "supported":
+            assert sorted(c["error"] is None for c in it["claims"]) == [False, True]
+            assert "는 몇" in it["question"] or "은 몇" in it["question"] or "인가" in it["question"]
+            assert "시간는" not in it["question"] and "전류은" not in it["question"]
+
+
+def test_physics_p0_engine_agrees_with_independent_gold():
+    pytest.importorskip("scipy")
+    from genesis_predict import physics_set as ps
+    rep = ps.p0(ps.make(seed=7, per_template=6, unsupported=0))
+    assert rep["engine_vs_gold_agree"] == 1.0 and rep["false_block_rate"] == 0.0 and rep["detection_rate"] == 1.0
+    assert rep["pass"]
+
+
+def test_physics_gold_is_independent_of_engine():
+    import inspect
+    from genesis_predict import physics_set as ps
+    src = inspect.getsource(ps)
+    gold_part = src[src.index("# ---- gold solvers"):src.index("# ---- planted errors")]
+    assert "physics." not in gold_part and "pint" not in gold_part
+
+
+def test_physics_score_model():
+    from genesis_predict import physics_set as ps
+    items = ps.make(seed=4, per_template=2, unsupported=2)
+    perfect = {it["id"]: ({"spec": it["spec"], "answer": it["gold"]} if it["status"] == "supported" else {"unsupported": True})
+               for it in items}
+    s = ps.score_model(items, perfect)
+    assert s["accuracy"] == 1.0 and s["spec_accuracy"] == 1.0 and s["unsupported_recall"] == 1.0 and s["engine_harm"] == 0
+    # a model that writes the right spec but miscalculates: the engine would rescue every item
+    sloppy = {k: ({"spec": v["spec"], "answer": v["answer"] * 2} if "spec" in v else v) for k, v in perfect.items()}
+    s2 = ps.score_model(items, sloppy)
+    assert s2["accuracy"] == 0.0 and s2["engine_rescue"] == 1.0
+    wrong_spec = dict(items[0]["spec"], params=dict(items[0]["spec"]["params"]))
+    k0 = next(iter(wrong_spec["params"]))
+    wrong_spec["params"][k0] = "999 m"
+    assert not ps.spec_equal(wrong_spec, items[0]["spec"])

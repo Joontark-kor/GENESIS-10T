@@ -97,8 +97,9 @@ class StatsForecastEngine:
 
 @dataclass
 class ChronosEngine:
-    """Chronos-2 (open weights). Needs ``pip install chronos-forecasting`` and a weight download."""
-    model_id: str = "amazon/chronos-2"
+    """Chronos-2 (open weights, default the 28M small model). Needs ``pip install chronos-forecasting``
+    and a weight download from Hugging Face on first use."""
+    model_id: str = "autogluon/chronos-2-small"
     device: str = "cpu"
     n_samples: int = 200
     seed: int = 0
@@ -107,20 +108,21 @@ class ChronosEngine:
 
     def _pipeline(self):
         if self._pipe is None:
-            from chronos import BaseChronosPipeline  # lazy; weight download happens here
+            from chronos import Chronos2Pipeline  # lazy; weight download happens here
 
-            self._pipe = BaseChronosPipeline.from_pretrained(self.model_id, device_map=self.device)
+            self._pipe = Chronos2Pipeline.from_pretrained(self.model_id, device_map=self.device)
         return self._pipe
 
     def forecast(self, history, horizon: int, season: int = 12) -> Forecast:
-        import torch  # lazy
+        import pandas as pd  # lazy
 
-        pipe = self._pipeline()
-        ctx = torch.tensor(np.asarray(history, dtype=np.float32))
-        q, _mean = pipe.predict_quantiles(ctx, prediction_length=horizon, quantile_levels=list(QUANTILES))
-        arr = q[0].detach().cpu().numpy() if hasattr(q, "detach") else np.asarray(q[0])
-        arr = arr.reshape(horizon, len(QUANTILES))
-        qs = {lv: arr[:, i] for i, lv in enumerate(QUANTILES)}
+        y = np.asarray(history, dtype=float)
+        ctx = pd.DataFrame({"id": "s", "timestamp": pd.date_range("2000-01-01", periods=len(y), freq="MS"),
+                            "target": y})
+        pred = self._pipeline().predict_df(ctx, prediction_length=horizon, quantile_levels=list(QUANTILES),
+                                           id_column="id", timestamp_column="timestamp", target="target")
+        pred = pred.sort_values("timestamp")
+        qs = {lv: pred[str(lv)].to_numpy(dtype=float)[:horizon] for lv in QUANTILES}
         return _quantiles_to_forecast(self.name, qs, self.n_samples, self.seed, meta={"model_id": self.model_id})
 
 
