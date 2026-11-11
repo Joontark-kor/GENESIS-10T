@@ -204,3 +204,50 @@ def test_kosis_retries_connection_reset():
         return io.BytesIO(json.dumps([{"ORG_ID": "1", "TBL_ID": "T", "ITM_ID": "I", "PRD_DE": "202401", "DT": "1"}]).encode())
     assert len(kosis.fetch_table("k", "1", "T", "202401", "202401", opener=opener, pause=0)) == 1
     assert calls["n"] == 2
+
+
+# ---------- physics dev set ----------
+
+def test_physics_set_shape_and_josa():
+    from genesis_predict import physics_set as ps
+    items = ps.make(seed=3, per_template=4, unsupported=5)
+    assert len(items) == 10 * 4 + 5
+    assert ps.josa("시간") == "시간은" and ps.josa("거리") == "거리는" and ps.josa("최고 높이(지면 기준)") == "최고 높이(지면 기준)는"
+    for it in items:
+        if it["status"] == "supported":
+            assert sorted(c["error"] is None for c in it["claims"]) == [False, True]
+            assert "는 몇" in it["question"] or "은 몇" in it["question"] or "인가" in it["question"]
+            assert "시간는" not in it["question"] and "전류은" not in it["question"]
+
+
+def test_physics_p0_engine_agrees_with_independent_gold():
+    pytest.importorskip("scipy")
+    from genesis_predict import physics_set as ps
+    rep = ps.p0(ps.make(seed=7, per_template=6, unsupported=0))
+    assert rep["engine_vs_gold_agree"] == 1.0 and rep["false_block_rate"] == 0.0 and rep["detection_rate"] == 1.0
+    assert rep["pass"]
+
+
+def test_physics_gold_is_independent_of_engine():
+    import inspect
+    from genesis_predict import physics_set as ps
+    src = inspect.getsource(ps)
+    gold_part = src[src.index("# ---- gold solvers"):src.index("# ---- planted errors")]
+    assert "physics." not in gold_part and "pint" not in gold_part
+
+
+def test_physics_score_model():
+    from genesis_predict import physics_set as ps
+    items = ps.make(seed=4, per_template=2, unsupported=2)
+    perfect = {it["id"]: ({"spec": it["spec"], "answer": it["gold"]} if it["status"] == "supported" else {"unsupported": True})
+               for it in items}
+    s = ps.score_model(items, perfect)
+    assert s["accuracy"] == 1.0 and s["spec_accuracy"] == 1.0 and s["unsupported_recall"] == 1.0 and s["engine_harm"] == 0
+    # a model that writes the right spec but miscalculates: the engine would rescue every item
+    sloppy = {k: ({"spec": v["spec"], "answer": v["answer"] * 2} if "spec" in v else v) for k, v in perfect.items()}
+    s2 = ps.score_model(items, sloppy)
+    assert s2["accuracy"] == 0.0 and s2["engine_rescue"] == 1.0
+    wrong_spec = dict(items[0]["spec"], params=dict(items[0]["spec"]["params"]))
+    k0 = next(iter(wrong_spec["params"]))
+    wrong_spec["params"][k0] = "999 m"
+    assert not ps.spec_equal(wrong_spec, items[0]["spec"])
