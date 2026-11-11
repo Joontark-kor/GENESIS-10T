@@ -39,7 +39,7 @@ Data paths (`data/applied/fin_v1`, `runs/applied`, `reports/applied`) are kept f
 ```bash
 pip install -e ".[dev]"          # core + tests
 pip install -e ".[fin,qlora]"    # finance task building + QLoRA (GPU machines)
-python -m pytest -q              # 84 passed, 1 skipped (no GPU needed; needs transformers+peft for the adapter smoke test)
+python -m pytest -q              # 86 passed, 1 skipped (no GPU needed; needs transformers+peft for the adapter smoke test)
 ```
 
 ## Conventions
