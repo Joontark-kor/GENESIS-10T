@@ -276,3 +276,22 @@ def test_e3_parse_and_normalize():
     from genesis_predict import physics
     assert physics.Q(s2["params"]["C"]).to("F").magnitude == pytest.approx(1e-5)
     assert physics.Q(s2["params"]["R"]).to("ohm").magnitude == pytest.approx(4700)
+
+
+def test_e2_build_score_without_gpu():
+    pytest.importorskip("statsforecast")
+    from genesis_predict import e2
+    months = [f"{2019 + i // 12}-{i % 12 + 1:02d}" for i in range(84)]
+    series = {f"s{k}": list(zip(months, _seasonal(84, k))) for k in range(3)}
+    items = e2.build_items(series)
+    assert len(items) == 3 * 2 * 2 and items[0]["target"] in ("2025-02", "2025-04")
+    assert "예측: 중앙값, 하한, 상한" in e2.prompt(items[0], True) and "ETS" in e2.prompt(items[0], True)
+    assert "ETS" not in e2.prompt(items[0], False)
+    good = [f"예측: {it['actual']}, {it['actual'] - 1}, {it['actual'] + 1}" for it in items]
+    junk = ["모르겠다"] * len(items)
+    rep = e2.score(items, junk, good)
+    assert rep["summary"]["llm_ets"]["mase"] == pytest.approx(0.0) and rep["summary"]["llm"]["parsed"] == 0.0
+    assert rep["comparisons"]["llm_ets_vs_llm"]["mase_gain"] == pytest.approx(1.0)
+    assert rep["pass_engine_helps_llm"] is True
+    json.dumps(rep)
+    assert e2.parse("... 예측: 1,234.5, 1,200, 1,300") == {"median": 1234.5, "p10": 1200.0, "p90": 1300.0}
