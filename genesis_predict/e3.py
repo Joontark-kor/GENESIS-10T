@@ -79,6 +79,8 @@ def normalize_spec(spec: dict | None) -> dict | None:
             s = s.replace(a, b)
         return s.strip()
     out = dict(spec)
+    if isinstance(out.get("template"), str):  # "projectile(range, ...; v0, ...)" -> "projectile"
+        out["template"] = out["template"].split("(")[0].strip()
     out["params"] = {k: clean(v) for k, v in (spec.get("params") or {}).items()} if isinstance(spec.get("params"), dict) else {}
     if out.get("unit"):
         out["unit"] = clean(out["unit"])
@@ -167,16 +169,18 @@ def main(argv=None) -> None:
     p.add_argument("--seeds", default="0,1,2")
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--batch-size", type=int, default=16)
+    p.add_argument("--prompt", choices=["v1", "v2"], default="v2", help="v1 = physics_set.PROMPT (failed on format, 11-11)")
     p.add_argument("--out", type=Path, required=True)
     a = p.parse_args(argv)
     a.out.mkdir(parents=True, exist_ok=True)
+    spec_prompt = physics_set.PROMPT if a.prompt == "v1" else physics_set.PROMPT_V2
     gen = Generator(a.model)
     per_seed = {}
     for seed in [int(s) for s in a.seeds.split(",")]:
         items = physics_set.make(seed=seed)[: a.limit]
         t0 = time.time()
         d = gen([DIRECT + it["question"] for it in items], a.batch_size)
-        s = gen([physics_set.PROMPT + it["question"] for it in items], a.batch_size)
+        s = gen([spec_prompt + it["question"] for it in items], a.batch_size)
         rep = score(items, d, s)
         rep["seconds"] = round(time.time() - t0, 1)
         (a.out / f"e3_seed{seed}.json").write_text(json.dumps(rep, ensure_ascii=False, indent=1, default=float), encoding="utf-8")
@@ -187,7 +191,7 @@ def main(argv=None) -> None:
     table = {f"{a_}.{b}": [round(per_seed[s][a_][b], 4) for s in per_seed] for a_, b in keys}
     table["detection"] = [round(per_seed[s]["detection"], 4) for s in per_seed]
     table["false_block"] = [round(per_seed[s]["false_block"], 4) for s in per_seed]
-    final = {"kind": REPORT_KIND, "model": a.model, "hardware": gen.hardware, "precision": gen.precision,
+    final = {"kind": REPORT_KIND, "model": a.model, "prompt": a.prompt, "hardware": gen.hardware, "precision": gen.precision,
              "seeds": list(per_seed), "by_seed": table,
              "pass_detection": min(table["detection"]) >= 0.8 and max(table["false_block"]) <= 0.02,
              "engine_beats_direct": min(table["spec_engine.accuracy"]) > max(table["direct.accuracy"])}

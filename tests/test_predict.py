@@ -304,3 +304,10 @@ def test_e3_extract_spec_lenient():
     b = e3.extract_spec("시나리오: {'template': 'ohm', 'params': {'V': '12 V', 'R': '4 ohm'}, 'ask': 'current', 'unit': 'A'}")
     assert b["ask"] == "current"
     assert e3.extract_spec("시나리오: {\"template\": \"ohm\", \"params\": {\"V\": ") is None
+
+
+def test_e3_normalize_template_signature_and_v2_prompt():
+    from genesis_predict import e3, physics_set as ps
+    s = e3.normalize_spec({"template": "incline(acceleration, normal_force; angle, mu, g, m)", "params": {"angle": 25}})
+    assert s["template"] == "incline"
+    assert '"template": "ohm"' in ps.PROMPT_V2 and ps.PROMPT_V2.endswith("문제: ")
