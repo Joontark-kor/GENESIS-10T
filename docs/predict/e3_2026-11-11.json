@@ -1,0 +1,88 @@
+{
+ "kind": "genesis_predict.e3/v1",
+ "run": "2026-11-11, Colab L4, Qwen/Qwen3-4B (thinking off, greedy), prompt v3, commit c0e4383",
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "items_per_seed": 240,
+ "by_seed": {
+  "direct.accuracy": [
+   0.7227,
+   0.7227,
+   0.6727
+  ],
+  "spec_model.accuracy": [
+   0.2545,
+   0.2364,
+   0.2409
+  ],
+  "spec_engine.accuracy": [
+   0.7591,
+   0.7318,
+   0.7727
+  ],
+  "spec_engine.spec_accuracy": [
+   0.7636,
+   0.75,
+   0.7727
+  ],
+  "spec_model.engine_rescue": [
+   0.5455,
+   0.5318,
+   0.55
+  ],
+  "spec_model.engine_harm": [
+   0.0409,
+   0.0364,
+   0.0182
+  ],
+  "spec_engine.unsupported_recall": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "detection": [
+   0.8,
+   0.7909,
+   0.8045
+  ],
+  "false_block": [
+   0.0864,
+   0.0864,
+   0.0682
+  ]
+ },
+ "pass_detection": false,
+ "engine_beats_direct": true,
+ "failures": {
+  "seed0": {
+   "no_engine_value": 44,
+   "engine_wrong_spec": 19
+  },
+  "seed1": {
+   "no_engine_value": 46,
+   "engine_wrong_spec": 19
+  },
+  "seed2": {
+   "no_engine_value": 43,
+   "engine_wrong_spec": 15
+  },
+  "by_template_seed0": {
+   "cooling": 20,
+   "heat": 17,
+   "incline": 12,
+   "rc_charge": 12,
+   "ohm": 2
+  },
+  "examples": [
+   "incline: g written as a bare number '9.81' (no unit) -> bad_spec, even on Earth where g should be omitted",
+   "unsupported questions: forced into a listed template (drag problem -> incline; copied the ohm example)"
+  ]
+ },
+ "history": {
+  "v1 (seed 0, 220 supported)": "direct 72.3%, specs solvable 0% (template name copied with its signature, unit-less numbers)",
+  "v2 pilot (40 items)": "specs solvable 70%, engine 70% vs direct 57.5%, false block 30% (dropped a stated non-Earth g)"
+ }
+}
