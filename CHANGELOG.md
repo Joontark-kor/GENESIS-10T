@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-11-11 (prepared; the owner tags the release)
+
+Scope of polarbear in this release (decision 2026-11-11, docs/12 last section): a tool for **structured calculation questions where the values are given** (finance ratios, everyday numbers, structured multi-step), called where the app knows the question is a calculation (`CalcClient`, `--pipeline polarbear`). It is not a default wrapper for every question: on prose math word problems (Korean GSM8K, 1319 items: 64.1% -> 59.7%) and on no-calculation questions (85.1% -> 79.2%) it is below baseline. No new option was added for that; reopen only if the DART demo shows the failure repeatedly.
+
+Below are the changes since 0.2.0.
+
 - 2026-11-08/09 (polarbear, measured on Qwen3-4B, Colab T4, one run per setting): opt-in `--route` (answer plainly first, keep the answer if it contains no worked-out value; otherwise solve with the formula pipeline); opt-in `--unit-hint`, `--exclude-check`, `--distractor-hint`, `--retry-prefill`. Options that measured no gain were removed (`--direction-retry`, `--multistep`, `--prose-retry`, `--lookup-hint`); their measurements stay in docs/12. New code-generated sets: `multi`, `lookup`, `units` (`genesis_calc.build_tasks --set`). New `choice` scorer and `genesis_calc.external` (KMMLU, Korean GSM8K; rows downloaded at run time, never committed). Colab scripts `colab_repeat.sh`, `colab_external.sh`, `colab_overnight.sh`.
 - Evidence so far (docs/12, last section): seeds 1-5, one run each: multi-step 78.7% -> 88.8%; everyday 93.1% -> 97.0%; no-calculation set 85.1% -> 79.2% (`--route` 82.2%, overlaps both); KMMLU 430 items 40.2 / 41.4 / 44.4 (within noise); Korean GSM8K full 1319 items 64.1 / 59.7 / 60.7 (polarbear and route are lower than baseline; paired comparison is significant). Decision 2026-11-11: no new option for the GSM8K-ko result; polarbear is scoped to structured calculation questions (docs/12, last section). Served evaluation equals local evaluation on one set (multi seed 4, 240 items: 86.7% local vs 86.2% through `mini_server`; 1 of 240 verdicts differs); `scripts/colab_serving.sh` repeats it.
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genesis-10t"
-version = "0.2.0"
+version = "0.3.0"
 description = "GENESIS: a Korean-first foundation-model core (data, training, adapters, evaluation harness, serving contract) and research toward a scalable MoE Transformer"
 readme = "README.md"
 requires-python = ">=3.10"
