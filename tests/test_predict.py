@@ -310,4 +310,4 @@ def test_e3_normalize_template_signature_and_v2_prompt():
     from genesis_predict import e3, physics_set as ps
     s = e3.normalize_spec({"template": "incline(acceleration, normal_force; angle, mu, g, m)", "params": {"angle": 25}})
     assert s["template"] == "incline"
-    assert '"template": "ohm"' in ps.PROMPT_V2 and ps.PROMPT_V2.endswith("문제: ")
+    assert '"template": "ohm"' in ps.PROMPT_V3 and ps.PROMPT_V3.endswith("문제: ") and "g에 그 값을" in ps.PROMPT_V3
