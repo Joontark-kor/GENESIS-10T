@@ -169,7 +169,7 @@ def main(argv=None) -> None:
     p.add_argument("--seeds", default="0,1,2")
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--batch-size", type=int, default=16)
-    p.add_argument("--prompt", choices=["v1", "v3"], default="v3", help="v1 = physics_set.PROMPT (failed on format, 11-11); v2 was a 40-item pilot"))
+    p.add_argument("--prompt", choices=["v1", "v3"], default="v3", help="v1 = physics_set.PROMPT (failed on format, 11-11); v2 was a 40-item pilot")
     p.add_argument("--out", type=Path, required=True)
     a = p.parse_args(argv)
     a.out.mkdir(parents=True, exist_ok=True)
