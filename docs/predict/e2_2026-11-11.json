@@ -1,0 +1,59 @@
+{
+ "kind": "genesis_predict.e2/v1",
+ "run": "2026-11-11, Colab L4, Qwen/Qwen3-4B (thinking off, greedy), commit c0e4383",
+ "data": {
+  "series_csv_sha256": "8c769a26bb792de8cf69793131ca0abac04687deff2f4eb32330d3379a48882c (refetched, identical to E1)",
+  "items": 212
+ },
+ "summary": {
+  "llm": {
+   "parsed": 0.0,
+   "mase": 0.874,
+   "coverage80": 0.028
+  },
+  "llm_ets": {
+   "parsed": 0.651,
+   "mase": 0.59,
+   "coverage80": 0.599
+  },
+  "ets": {
+   "parsed": 1.0,
+   "mase": 0.402,
+   "coverage80": 0.882
+  }
+ },
+ "comparisons_as_preregistered": {
+  "llm_ets_vs_llm": {
+   "mase_gain": 0.21,
+   "ci95": [
+    0.129,
+    0.292
+   ]
+  },
+  "llm_ets_vs_ets": {
+   "mase_gain": -0.637,
+   "ci95": [
+    -1.133,
+    -0.249
+   ]
+  },
+  "ets_vs_llm": {
+   "mase_gain": 0.351,
+   "ci95": [
+    0.265,
+    0.435
+   ]
+  }
+ },
+ "pass_engine_helps_llm_as_computed": true,
+ "verdict": "INVALID - the llm condition never produced the required line (0/212 parsed; long data restatement hit the 256-token limit), so every llm answer fell back to the last observed value. The pre-registered comparison measures llm_ets against persistence, not against the model.",
+ "parsed_subset": {
+  "n": 138,
+  "llm_ets_mase": 0.371,
+  "ets_mase": 0.37,
+  "llm_ets_cov80": 0.906,
+  "ets_cov80": 0.913,
+  "llm_ets_median_within_0.5pct_of_ets": "138/138"
+ },
+ "finding": "Given the ETS forecast, the 4B model copied it in every parsed case (138/138). It added nothing; when it failed the format (35%), the fallback made it worse than ETS alone."
+}

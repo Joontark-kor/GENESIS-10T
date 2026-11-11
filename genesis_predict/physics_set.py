@@ -466,6 +466,37 @@ ohm(current, power; V, R), ideal_gas(pressure; n, T, V). 이 목록으로 풀 �
 문제: """
 
 
+PROMPT_V3 = """다음 물리 문제에 맞는 시나리오를 써라. 계산은 시나리오를 받은 계산기가 한다.
+반드시 아래 두 줄만 써라.
+시나리오: {"template": 이름, "params": {이름: "숫자 단위"}, "ask": 구할 것, "unit": 답의 단위}
+정답: 숫자
+
+규칙
+- params의 값은 문제에 나온 숫자와 단위를 그대로 쓴 문자열이다. 예: "36 km/h", "200 cm", "45 deg", "4.7 kohm", "10 uF", "90 degC", "0.1 1/min".
+- 마찰 계수 mu처럼 단위가 없는 값만 숫자로 쓴다.
+- 문제에 중력가속도가 주어지면(달, 화성 등) g에 그 값을 반드시 쓴다. 주어지지 않으면 g를 쓰지 않는다(지구 9.81).
+- 아래 목록으로 풀 수 없는 문제면 "시나리오: 미지원"이라고만 써라.
+
+template (ask / params)
+projectile (range, max_height, flight_time / v0, angle, h0, g)
+free_fall (time, impact_speed / h, g)
+pendulum (period / L, g)
+spring (period, energy, max_speed / k, m, x)
+incline (acceleration, normal_force / angle, mu, m, g)
+heat (energy / m, c, dT)
+cooling (temperature / T0, Tenv, k, t)
+rc_charge (voltage, time_constant / V, R, C, t)
+ohm (current, power / V, R)
+ideal_gas (pressure / n, T, V)
+
+예시
+문제: 4 Ω 저항 양단에 12 V를 걸었다. 저항에서 소비되는 전력은 몇 W인가?
+시나리오: {"template": "ohm", "params": {"V": "12 V", "R": "4 ohm"}, "ask": "power", "unit": "W"}
+정답: 36
+
+문제: """
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest="cmd", required=True)

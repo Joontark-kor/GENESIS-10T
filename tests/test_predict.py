@@ -251,3 +251,63 @@ def test_physics_score_model():
     k0 = next(iter(wrong_spec["params"]))
     wrong_spec["params"][k0] = "999 m"
     assert not ps.spec_equal(wrong_spec, items[0]["spec"])
+
+
+def test_e3_score_without_gpu():
+    from genesis_predict import e3, physics_set as ps
+    items = ps.make(seed=5, per_template=1, unsupported=1)
+    sup = [it for it in items if it["status"] == "supported"]
+    direct = [f"풀이 생략\n정답: {it['gold'] * 2}" for it in sup] + ["모름"]
+    spec = [f"시나리오: {json.dumps(it['spec'], ensure_ascii=False)}\n정답: {it['gold'] * 2}" for it in sup] + ["시나리오: 미지원"]
+    rep = e3.score(sup + [items[-1]], direct, spec)["summary"]
+    assert rep["direct"]["accuracy"] == 0.0 and rep["spec_model"]["accuracy"] == 0.0
+    assert rep["spec_engine"]["accuracy"] == 1.0 and rep["spec_model"]["engine_rescue"] == 1.0
+    assert rep["detection"] == 1.0 and rep["false_block"] == 0.0
+    assert rep["spec_engine"]["unsupported_recall"] == 1.0
+
+
+def test_e3_parse_and_normalize():
+    from genesis_predict import e3
+    assert e3.parse_answer("... 정답: 1,234.5") == 1234.5 and e3.parse_answer("정답: -3.2e2") == -320.0
+    assert e3.parse_answer("답 없음") is None
+    s = e3.normalize_spec({"template": "cooling", "params": {"T0": "90 °C", "k": "0.1 1/min"}, "unit": "°C"})
+    assert s["params"]["T0"] == "90 degC" and s["unit"] == "degC"
+    s2 = e3.normalize_spec({"template": "rc_charge", "params": {"C": "10 μF", "R": "4.7 kΩ"}})
+    from genesis_predict import physics
+    assert physics.Q(s2["params"]["C"]).to("F").magnitude == pytest.approx(1e-5)
+    assert physics.Q(s2["params"]["R"]).to("ohm").magnitude == pytest.approx(4700)
+
+
+def test_e2_build_score_without_gpu():
+    pytest.importorskip("statsforecast")
+    from genesis_predict import e2
+    months = [f"{2019 + i // 12}-{i % 12 + 1:02d}" for i in range(84)]
+    series = {f"s{k}": list(zip(months, _seasonal(84, k))) for k in range(3)}
+    items = e2.build_items(series)
+    assert len(items) == 3 * 2 * 2 and items[0]["target"] in ("2025-02", "2025-04")
+    assert "예측: 중앙값, 하한, 상한" in e2.prompt(items[0], True) and "ETS" in e2.prompt(items[0], True)
+    assert "ETS" not in e2.prompt(items[0], False)
+    good = [f"예측: {it['actual']}, {it['actual'] - 1}, {it['actual'] + 1}" for it in items]
+    junk = ["모르겠다"] * len(items)
+    rep = e2.score(items, junk, good)
+    assert rep["summary"]["llm_ets"]["mase"] == pytest.approx(0.0) and rep["summary"]["llm"]["parsed"] == 0.0
+    assert rep["comparisons"]["llm_ets_vs_llm"]["mase_gain"] == pytest.approx(1.0)
+    assert rep["pass_engine_helps_llm"] is True
+    json.dumps(rep)
+    assert e2.parse("... 예측: 1,234.5, 1,200, 1,300") == {"median": 1234.5, "p10": 1200.0, "p90": 1300.0}
+
+
+def test_e3_extract_spec_lenient():
+    from genesis_predict import e3
+    a = e3.extract_spec("풀이...\n시나리오: ```json\n{\"template\": \"ohm\", \"params\": {\"V\": \"12 V\", \"R\": \"4 ohm\"}, \"ask\": \"power\", \"unit\": \"W\"}\n```\n정답: 36")
+    assert a["template"] == "ohm"
+    b = e3.extract_spec("시나리오: {'template': 'ohm', 'params': {'V': '12 V', 'R': '4 ohm'}, 'ask': 'current', 'unit': 'A'}")
+    assert b["ask"] == "current"
+    assert e3.extract_spec("시나리오: {\"template\": \"ohm\", \"params\": {\"V\": ") is None
+
+
+def test_e3_normalize_template_signature_and_v2_prompt():
+    from genesis_predict import e3, physics_set as ps
+    s = e3.normalize_spec({"template": "incline(acceleration, normal_force; angle, mu, g, m)", "params": {"angle": 25}})
+    assert s["template"] == "incline"
+    assert '"template": "ohm"' in ps.PROMPT_V3 and ps.PROMPT_V3.endswith("문제: ") and "g에 그 값을" in ps.PROMPT_V3
