@@ -2,9 +2,8 @@
 
 ## Unreleased
 
+- Harness: `compare` also prints a paired comparison of the first report against the others (items only one got right, McNemar z); new `seeds LABEL=GLOB` command (mean and min-max over reports); `run --resume` continues an interrupted run from `OUT.partial.jsonl` (written after every batch, includes polarbear counters, time and tokens). `scripts/colab_*.sh` skip finished reports and resume unfinished ones, and the overnight script prints the seed summary (+8 tests).
 - **Track B (from-scratch pretraining) moved to the separate `ssial` repository.** This repository is Track A only. Removed: the pretraining modules, `genesis/data/`, `configs/`, `tokenizers/`, `data/`, docs 00-05 and `architecture.md`, and their tests. `file_sha256` and `assign_split` moved to `genesis/util.py`. New boundary tests: nothing imports `ssial`; the pretraining modules stay gone. History before this change (up to `v0.3.0`) is unchanged.
-
-## Unreleased
 
 - `genesis_fin.demo`: terminal demo for 4-a. One ratio question about one listed company's filing returns the value, the formula, the filing link and a recomputation check; out-of-scope questions are refused instead of sent to the model. Tested with a fake model only (+6 tests).
 

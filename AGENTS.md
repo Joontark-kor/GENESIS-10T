@@ -16,7 +16,7 @@ GENESIS is a three-layer base for the owner's work: (1) base weights (open model
 | Path | Role |
 |---|---|
 | `genesis/adapt/` | data format + LoRA/QLoRA fine-tuning (`python -m genesis.adapt.finetune`) |
-| `genesis/harness/` | evaluation harness + scorers (`python -m genesis.harness.evaluate run\|compare`) |
+| `genesis/harness/` | evaluation harness + scorers (`python -m genesis.harness.evaluate run [--resume]\|compare\|seeds`) |
 | `genesis/serving/` | OpenAI-compatible endpoint (vLLM / Ollama / local); `mini_server.py` = test-only transformers server; `calc.py` = `CalcClient` (multistep check on Qwen3-4B (4 questions): compound interest, discount+shipping, share-% right, CAGR wrong (missing parentheses, now flagged); `multistep=True` allows several 계산식 lines with `#1` references; `prefill=True` for vLLM/mini_server; real-endpoint check on Qwen3-4B, 6 questions: without prefill discount/BMI got no formula; with prefill both correct; CAGR missing *100 is now warned via `percent_flag`): model writes the formula, calculator answers, result carries formula + warnings |
 | `genesis/safety.py` | `SafetyCheck` protocol, `AllowAll`, `guarded_chat` (interface only) |
 | `genesis/precision.py` | bf16 on CUDA capability >= 8, fp16 on T4, fp32 on CPU |
@@ -39,7 +39,7 @@ Data paths (`data/applied/fin_v1`, `runs/applied`, `reports/applied`) are kept f
 ```bash
 pip install -e ".[dev]"          # core + tests
 pip install -e ".[fin,qlora]"    # finance task building + QLoRA (GPU machines)
-python -m pytest -q              # 86 passed, 1 skipped (no GPU needed; needs transformers+peft for the adapter smoke test)
+python -m pytest -q              # 94 passed, 1 skipped (no GPU needed; needs transformers+peft for the adapter smoke test)
 ```
 
 ## Conventions
