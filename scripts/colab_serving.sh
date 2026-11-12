@@ -32,7 +32,7 @@ python -m genesis.harness.evaluate run --endpoint http://127.0.0.1:8000/v1 --mod
 kill $SERVER
 echo "endpoint done $(date +%H:%M)"
 
-python -m genesis.harness.evaluate compare reports/applied/srv-local-pb.json reports/applied/srv-endpoint-pb.json 2>&1 | tail -4
+python -m genesis.harness.evaluate compare reports/applied/srv-local-pb.json reports/applied/srv-endpoint-pb.json 2>&1 | tail -9
 python - <<'PY'
 import json
 a = json.load(open("reports/applied/srv-local-pb.json"))["rows"]

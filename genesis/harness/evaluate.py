@@ -14,6 +14,14 @@
     # side-by-side table
     python -m genesis.harness.evaluate compare reports/applied/base.json reports/applied/fin-v1.json
 
+    # paired comparison (who is right where the other is wrong), and mean/min/max over seeds
+    python -m genesis.harness.evaluate compare reports/applied/base.json reports/applied/pb.json
+    python -m genesis.harness.evaluate seeds base='reports/applied/rep-multi-s*-base.json' \
+        pb='reports/applied/rep-multi-s*-pb.json'
+
+    # long runs: --resume continues from OUT.partial.jsonl after a crash or a lost session
+    python -m genesis.harness.evaluate run ... --out reports/applied/x.json --resume
+
 Each item has ``messages`` (the prompt), ``gold`` and optionally ``kind``,
 ``tolerance`` and ``scorer``. The scorer (``numeric`` by default, see
 ``genesis.harness.scorers``) decides correctness. Decoding is greedy, so runs
@@ -27,6 +35,8 @@ these fields change.
 from __future__ import annotations
 
 import argparse
+import glob
+import math
 from collections import defaultdict
 from datetime import datetime, timezone
 import json
@@ -148,6 +158,104 @@ class EndpointGenerator:
         return results
 
 
+COUNTERS = ("calls", "fallbacks", "ungrounded", "direction", "retried", "rescued", "contradicted",
+            "contradiction_rescued", "routed_plain", "routed_polar")
+
+
+def paired(first: dict, second: dict) -> dict:
+    """Paired comparison of two reports on the same items (matched by id).
+
+    ``first_only`` / ``second_only`` count items only that report got right. ``z`` is the McNemar
+    statistic (first_only - second_only) / sqrt(first_only + second_only): positive means the first
+    report is better, |z| > 1.96 is about p < 0.05. Items are matched by id, so both reports must
+    come from the same data file.
+    """
+    a = {row["id"]: row["correct"] for row in first["rows"]}
+    b = {row["id"]: row["correct"] for row in second["rows"]}
+    ids = [i for i in a if i in b]
+    if not ids or len(a) != len(b) or len(ids) != len(a) or None in a:
+        raise ValueError(f"reports {first['name']!r} and {second['name']!r} do not cover the same item ids "
+                         f"({len(a)} vs {len(b)} items, {len(ids)} in common)")
+    first_only = sum(a[i] and not b[i] for i in ids)
+    second_only = sum(b[i] and not a[i] for i in ids)
+    both = sum(a[i] and b[i] for i in ids)
+    discordant = first_only + second_only
+    z = (first_only - second_only) / math.sqrt(discordant) if discordant else 0.0
+    return {"first": first["name"], "second": second["name"], "items": len(ids), "both": both,
+            "neither": len(ids) - both - discordant, "first_only": first_only, "second_only": second_only,
+            "z": round(z, 2)}
+
+
+def paired_markdown(reports: list[dict]) -> str:
+    """The first report against each of the others."""
+    lines = ["| first | second | items | both right | only first | only second | z |", "|---|---|---|---|---|---|---|"]
+    for other in reports[1:]:
+        try:
+            r = paired(reports[0], other)
+        except ValueError as error:
+            lines.append(f"| {reports[0]['name']} | {other['name']} | | | | | not comparable: {error} |")
+            continue
+        lines.append(f"| {r['first']} | {r['second']} | {r['items']} | {r['both']} | {r['first_only']} | "
+                     f"{r['second_only']} | {r['z']:+.2f} |")
+    return "\n".join(lines)
+
+
+def seed_summary(groups: dict[str, list[dict]]) -> list[dict]:
+    """Mean and range of accuracy over several runs (for example seeds 1-5), overall and per kind."""
+    out = []
+    for label, reports in groups.items():
+        accs = [r["accuracy"] for r in reports]
+        kinds = {}
+        for kind in sorted({k for r in reports for k in r["by_kind"]}):
+            vals = [r["by_kind"][kind]["accuracy"] for r in reports if kind in r["by_kind"]]
+            kinds[kind] = {"mean": sum(vals) / len(vals), "min": min(vals), "max": max(vals)}
+        out.append({"label": label, "runs": len(reports), "items": [r["items"] for r in reports],
+                    "mean": sum(accs) / len(accs), "min": min(accs), "max": max(accs), "by_kind": kinds,
+                    "names": [r["name"] for r in reports]})
+    return out
+
+
+def seeds_markdown(summary: list[dict]) -> str:
+    kinds = sorted({k for g in summary for k in g["by_kind"]})
+    header = ["group", "runs", "mean", "min-max", *[f"{k} (mean)" for k in kinds]]
+    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+    for g in summary:
+        cells = [g["label"], str(g["runs"]), f"{g['mean']:.1%}", f"{g['min']:.1%}-{g['max']:.1%}"]
+        cells += [f"{g['by_kind'][k]['mean']:.1%}" if k in g["by_kind"] else "" for k in kinds]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def _partial_path(out: Path | None) -> Path | None:
+    return out.with_name(out.name + ".partial.jsonl") if out else None
+
+
+def _load_partial(path: Path, items: list[dict]) -> tuple[list[dict], int, float, dict]:
+    """Rows already finished by an earlier, interrupted run: (rows, generated tokens, seconds, counters).
+
+    Only whole batches are trusted, and only while they match the items by id and gold answer
+    (a changed data file starts over instead of mixing two runs).
+    """
+    rows, tokens, seconds, counters = [], 0, 0.0, {}
+    if not path.exists():
+        return rows, tokens, seconds, counters
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            break  # the run died while writing this line
+        batch = record["rows"]
+        start = len(rows)
+        if start + len(batch) > len(items) or any(
+                row["id"] != item.get("id") or row["gold"] != item["gold"]
+                for row, item in zip(batch, items[start:start + len(batch)])):
+            print(f"resume: {path} does not match this data; starting from item 0")
+            return [], 0, 0.0, {}
+        rows += batch
+        tokens, seconds, counters = record["tokens"], record["seconds"], record.get("counters", {})
+    return rows, tokens, seconds, counters
+
+
 def run(args) -> dict:
     items = load_jsonl(args.data)
     if args.limit:
@@ -160,22 +268,41 @@ def run(args) -> dict:
                                 hint=args.distractor_hint, prefill=args.retry_prefill,
                                 unit_hint=args.unit_hint, exclude_check=args.exclude_check, route=args.route)
     default_scorer = args.scorer
-    rows, generated_tokens = [], 0
+    partial = _partial_path(args.out)
+    rows, generated_tokens, earlier_seconds = [], 0, 0.0
+    if args.resume and partial:
+        rows, generated_tokens, earlier_seconds, counters = _load_partial(partial, items)
+        for name, value in counters.items():
+            if hasattr(generator, name):
+                setattr(generator, name, value)
+        if rows:
+            print(f"resume: {len(rows)}/{len(items)} items already done ({earlier_seconds:.0f}s)")
+    elif partial and partial.exists():
+        partial.unlink()  # a fresh run never mixes in an old partial file
     generator.sync()
     started = time.perf_counter()
-    for begin in range(0, len(items), args.batch_size):
+    for begin in range(len(rows), len(items), args.batch_size):
         batch = items[begin:begin + args.batch_size]
         t0 = time.perf_counter()
         outputs = generator.generate(batch)
         batch_seconds = time.perf_counter() - t0
+        batch_rows = []
         for item, (text, n_tokens) in zip(batch, outputs):
             generated_tokens += n_tokens
             scorer_name = item.get("scorer", default_scorer)
             prediction, correct = resolve(scorer_name)(text, item)
-            rows.append({"id": item.get("id"), "kind": item.get("kind", "unknown"), "lang": item.get("lang"),
-                         "scorer": scorer_name, "gold": item["gold"], "prediction": prediction,
-                         "correct": bool(correct), "output": text, "seconds": batch_seconds / len(batch)})
-    seconds = time.perf_counter() - started
+            batch_rows.append({"id": item.get("id"), "kind": item.get("kind", "unknown"), "lang": item.get("lang"),
+                               "scorer": scorer_name, "gold": item["gold"], "prediction": prediction,
+                               "correct": bool(correct), "output": text, "seconds": batch_seconds / len(batch)})
+        rows += batch_rows
+        if partial:
+            partial.parent.mkdir(parents=True, exist_ok=True)
+            record = {"rows": batch_rows, "tokens": generated_tokens,
+                      "seconds": earlier_seconds + time.perf_counter() - started,
+                      "counters": {n: getattr(generator, n) for n in COUNTERS if hasattr(generator, n)}}
+            with partial.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    seconds = earlier_seconds + time.perf_counter() - started
     on_gpu = bool(args.endpoint) or getattr(generator, "use_cuda", False)
     gpu_hours = seconds / 3600 if on_gpu else 0.0
     report = {
@@ -217,6 +344,8 @@ def run(args) -> dict:
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        if partial and partial.exists():
+            partial.unlink()
     print(to_markdown([report]))
     return report
 
@@ -258,6 +387,8 @@ def main(argv: list[str] | None = None):
     r.add_argument("--load-4bit", action="store_true")
     r.add_argument("--template-kwargs", default="{}")
     r.add_argument("--cpu", action="store_true")
+    r.add_argument("--resume", action="store_true",
+                   help="continue from OUT.partial.jsonl (written after every batch) instead of starting over; needs --out")
     r.add_argument("--pipeline", choices=["none", "polarbear"], default="none",
                    help="polarbear: the model writes a formula, a calculator computes the answer")
     r.add_argument("--pipeline-digits", type=int, default=2, help="decimals of the calculated answer")
@@ -275,13 +406,32 @@ def main(argv: list[str] | None = None):
                    help="polarbear: the model lists the numbers it will not use first; a formula that uses one is retried once. Only for questions with distractor numbers: on the finance set it dropped accuracy from ~98.8% to 75.9%")
     c = sub.add_parser("compare")
     c.add_argument("reports", type=Path, nargs="+")
+    c.add_argument("--no-paired", action="store_true", help="skip the paired comparison of the first report against the others")
+    sd = sub.add_parser("seeds", help="mean and min-max of accuracy over several reports per group")
+    sd.add_argument("groups", nargs="+", metavar="LABEL=GLOB", help="e.g. pb='reports/applied/rep-multi-s*-pb.json'")
     args = p.parse_args(argv)
+    if args.command == "run" and args.resume and not args.out:
+        p.error("--resume needs --out (the partial file lives next to it)")
     if args.command == "run":
         if args.endpoint and (args.adapter or args.load_4bit):
             p.error("--adapter/--load-4bit apply to local models; with --endpoint pass the served adapter name as --model")
         return run(args)
+    if args.command == "seeds":
+        groups = {}
+        for spec in args.groups:
+            label, _, pattern = spec.partition("=")
+            paths = sorted(glob.glob(pattern))
+            if not label or not pattern or not paths:
+                p.error(f"{spec!r}: expected LABEL=GLOB matching at least one report")
+            groups[label] = [json.loads(Path(path).read_text(encoding="utf-8")) for path in paths]
+        summary = seed_summary(groups)
+        print(seeds_markdown(summary))
+        return summary
     reports = [json.loads(path.read_text(encoding="utf-8")) for path in args.reports]
     print(to_markdown(reports))
+    if len(reports) > 1 and not args.no_paired:
+        print()
+        print(paired_markdown(reports))
     return reports
 
 

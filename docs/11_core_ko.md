@@ -45,6 +45,20 @@ python -m genesis.serving.endpoint models --url http://localhost:8000/v1
 
 평가 문항은 `messages`, `gold`와 선택 필드 `kind`, `tolerance`, `scorer`로 이루어진다. 채점기는 코어에 분야 중립적인 `numeric`(허용 오차 안의 숫자)과 `exact`가 있고, 분야 채점기는 `--scorer 모듈:함수`로 붙인다.
 
+### 보고서를 읽는 도구 (2026-11-12)
+
+```bash
+# 짝 비교: 같은 문항에서 한쪽만 맞힌 수와 McNemar z (앞 보고서가 낫다 = +, |z|>1.96 ≈ p<0.05)
+python -m genesis.harness.evaluate compare reports/a.json reports/b.json
+# 여러 seed: 묶음별 평균과 최소-최대
+python -m genesis.harness.evaluate seeds base='reports/rep-multi-s*-base.json' pb='reports/rep-multi-s*-pb.json'
+# 긴 평가: 문항 묶음마다 OUT.partial.jsonl에 저장, 세션이 끊기면 같은 명령에 --resume을 붙여 이어서
+python -m genesis.harness.evaluate run ... --out reports/x.json --resume
+```
+
+- 짝 비교는 문항 id로 맞추므로 같은 평가 파일로 만든 보고서끼리만 된다(아니면 "not comparable"). 11-11에 손으로 낸 GSM8K 수치(143 대 85, z≈3.84)를 이 명령으로 다시 낼 수 있다.
+- 이어하기는 id와 정답이 같은 문항까지만 믿고, 평가 파일이 바뀌었으면 처음부터 다시 한다. 폴라베어 카운터(재시도·대체 수 등)와 누적 시간·토큰도 저장해 최종 보고서가 한 번에 돌린 것과 같은 필드를 가진다. `--resume` 없이 돌리면 옛 partial 파일은 버린다.
+
 ## 규약 3: 버전으로 동결한다
 
 평가 세트를 고정한 채 점수를 기록하면 그 상태를 `vX.Y.Z` 태그로 동결한다. 적용과 앱은 "GENESIS 버전 + 어댑터 + 평가 보고서" 세 가지에 고정해 의존한다. 기반 교체나 코어 변경은 새 버전으로만 들어간다.

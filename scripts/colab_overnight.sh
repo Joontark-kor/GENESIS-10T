@@ -4,17 +4,18 @@
 # Usage (Colab, after cloning the repo; export HF_TOKEN in a Python cell first to keep reports):
 #   bash scripts/colab_repeat.sh
 cd "$(dirname "$0")/.."
-ev() {  # name data-dir extra-flags
+ev() {  # name data-dir extra-flags (a finished report is kept; an interrupted run continues from its .partial.jsonl)
+  [ -f "reports/applied/$1.json" ] && { echo "$1 already done"; return; }
   python -m genesis.harness.evaluate run --model Qwen/Qwen3-4B --template-kwargs '{"enable_thinking": false}' \
     --data "$2/eval_test.jsonl" --name "$1" $3 --batch-size 16 --max-new-tokens ${EV_TOKENS:-192} --gpu-hour-price 1.0 \
-    --out "reports/applied/$1.json" > "/tmp/$1.log" 2>&1
+    --out "reports/applied/$1.json" --resume >> "/tmp/$1.log" 2>&1
   if [ -f "reports/applied/$1.json" ]; then echo "$1 done $(date +%H:%M)"; else echo "$1 FAILED $(date +%H:%M)"; tail -n 15 "/tmp/$1.log"; fi
 }
 trio() {  # prefix data-dir
   ev "$1-base" "$2" ""
   ev "$1-pb" "$2" "--pipeline polarbear"
   ev "$1-route" "$2" "--pipeline polarbear --route"
-  python -m genesis.harness.evaluate compare "reports/applied/$1-base.json" "reports/applied/$1-pb.json" "reports/applied/$1-route.json" 2>&1 | tail -5
+  python -m genesis.harness.evaluate compare "reports/applied/$1-base.json" "reports/applied/$1-pb.json" "reports/applied/$1-route.json" 2>&1 | tail -12
 }
 save() {
   # Colab secrets cannot be read from a subprocess: the notebook exports HF_TOKEN first
@@ -35,6 +36,10 @@ for seed in 4 5; do
     trio "rep-${set}-s${seed}" "$dir"
   done
   save
+done
+for set in multi lookup basic; do  # mean and range over every seed report found (seeds 4-5 here; copy earlier reports in to include 1-3)
+  echo "== $set"; python -m genesis.harness.evaluate seeds base="reports/applied/rep-$set-s*-base.json" \
+    pb="reports/applied/rep-$set-s*-pb.json" route="reports/applied/rep-$set-s*-route.json" 2>&1 | tail -6
 done
 python -m genesis_calc.external --kind gsm8k-ko --out data/external/gsm8k-full --limit 1319 || { echo "build failed"; echo ALL DONE; exit; }
 EV_TOKENS=384
